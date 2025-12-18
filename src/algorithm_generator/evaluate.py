@@ -285,18 +285,24 @@ def load_models_from_directory(models_dir: str, logging: bool=False):
 
     return models
 
+from pathlib import Path
 
 def main():
     logging = False
-    models_dir = "/Users/annikaks/Desktop/omega/src/algorithm_generator/metaomni"
-    print("Loading models from:", models_dir)
-    print(f"{len(os.listdir(models_dir))} Files:", os.listdir(models_dir)) 
+    
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    metaomni_dir = os.path.join(current_dir, "metaomni")
+    models_dir = [metaomni_dir]
 
     suite = BenchmarkSuite(
-        dataset_names=["Iris", "Wine", "Breast Cancer", "Digits", "California Housing"],
+        dataset_names=["Iris", "Wine", "Breast Cancer", "Digits"],
     )
 
-    models = load_models_from_directory(models_dir, logging)
+    models = []
+    for dir in models_dir:
+        print(f"loading {len(os.listdir(dir))} files from {dir}") 
+        models.extend(load_models_from_directory(dir, logging))
+    
 
     if not models:
         print("No valid models found.")
