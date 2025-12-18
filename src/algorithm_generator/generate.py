@@ -3,11 +3,26 @@ import importlib
 import os
 import re
 import traceback
+from sklearn.metrics import accuracy_score
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 import anthropic
 from tqdm import tqdm
 
 import metaomni
+
+X, y = load_iris(return_X_y=True)
+
+x_train, x_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# optional but often helpful
+scaler = StandardScaler()
+x_train = scaler.fit_transform(x_train)
+x_test = scaler.transform(x_test)
 
 class AlgoGen:
 
@@ -79,15 +94,35 @@ class AlgoGen:
                 pass
             return False
         
-        EXECUTION_STRINGS = f"""importlib.reload(metaomni)
-ml_model = metaomni.{filename.split('.py')[0]}.{class_name}()
+        module_name = filename.split(".py")[0]
+
+        EXECUTION_STRINGS = f"""
+m = importlib.import_module("metaomni.{module_name}")
+importlib.reload(m)
+print("Module:", m)
+print("Has class:", hasattr(m, "{class_name}"))
+
+Cls = getattr(m, "{class_name}")
+ml_model = Cls()
+
 ml_model.fit(x_train, y_train)
 preds = ml_model.predict(x_test)
 accuracy = accuracy_score(y_test, preds)
-print(class_name, accuracy)"""
+print("{class_name}", accuracy)
+        """
         
         try:
-            exec(EXECUTION_STRINGS)
+            exec_globals = {
+                "importlib": importlib,
+                "metaomni": metaomni,
+                "accuracy_score": accuracy_score,
+                "x_train": x_train,
+                "y_train": y_train,
+                "x_test": x_test,
+                "y_test": y_test,
+            }
+
+            exec(EXECUTION_STRINGS, exec_globals)
             return True  # Success - code executed without errors
         except Exception as e:
             error_message = traceback.format_exc()
