@@ -186,3 +186,5 @@ Support Vector Machine
 Gradient Boosting Machine
 Quadratic Discriminant Analysis
 Linear Discriminant Analysis""".split('\n')
+
+NUM_IDEAS = 3

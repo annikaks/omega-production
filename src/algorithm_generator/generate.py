@@ -13,10 +13,18 @@ class AlgoGen:
 
     def __init__(self, anthropic_client: anthropic.Anthropic):
         self.anthropic_client = anthropic_client
+    
+    def _get_metaomni_path(self, filename=None):
+        """Get the path to metaomni directory, optionally with a filename."""
+        current_dir = os.path.dirname(__file__)
+        metaomni_dir = os.path.join(current_dir, 'metaomni')
+        if filename:
+            return os.path.join(metaomni_dir, filename)
+        return metaomni_dir
 
     def gen(self, prompt: str) -> str:
         message = self.anthropic_client.messages.create(
-            model="claude-3-5-sonnet-20240620",
+            model="claude-sonnet-4-5-20250929",
             max_tokens=4000,
             temperature=0,
             system="You are a world-class research engineer.",
@@ -41,11 +49,17 @@ class AlgoGen:
 
     def save_first_snippet(self, snippets, filename: str):
         if snippets:
+            directory = os.path.dirname(filename)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            
             with open(filename, 'w') as file:
                 file.write(snippets[0])
             print(f"First code snippet saved to {filename}")
+            return True
         else:
             print("No code snippets found")
+            return False
 
     def extract_name(self, text: str) -> str:
         pattern = r'<name>(.*?)</name>'
@@ -56,12 +70,14 @@ class AlgoGen:
             return None
 
     def execute(self, filename, class_name, model, count=1):
+        filepath = self._get_metaomni_path(filename)
         if count > 2:
             try:
-                os.remove(filename)
-                return
+                os.remove(filepath)
+                return False  # Indicate failure - file was deleted
             except:
                 pass
+            return False
         
         EXECUTION_STRINGS = f"""importlib.reload(metaomni)
 ml_model = metaomni.{filename.split('.py')[0]}.{class_name}()
@@ -72,13 +88,15 @@ print(class_name, accuracy)"""
         
         try:
             exec(EXECUTION_STRINGS)
+            return True  # Success - code executed without errors
         except Exception as e:
             error_message = traceback.format_exc()
             print("Hit error: ", error_message)
             
+            filepath = self._get_metaomni_path(filename)
             prompt = f"""
             Existing code:
-            {open(f'metaomni/{filename}', 'r').read()}
+            {open(filepath, 'r').read()}
         
             Error message on original execution:
             {e}
@@ -90,8 +108,9 @@ print(class_name, accuracy)"""
             implementation = self.gen(prompt)
             
             snippets = self.extract_code_snippets(implementation)
-            self.save_first_snippet(snippets, 'metaomni/' + filename)
-            self.execute(filename, class_name, model, count+1)
+            self.save_first_snippet(snippets, filepath)
+            # Recursively try to fix - return the result
+            return self.execute(filename, class_name, model, count+1)
 
     def add_import_to_init(self, init_file_path, import_string):
         # Read the current contents of the file
@@ -107,7 +126,26 @@ print(class_name, accuracy)"""
         else:
             print(f"{import_string} already exists in {init_file_path}")
 
+    def remove_import_from_init(self, init_file_path, import_string):
+        """Removes a specific import string from the __init__.py file."""
+        if not os.path.exists(init_file_path):
+            return
+
+        with open(init_file_path, 'r') as file:
+            lines = file.readlines()
+
+        # Filter out the line that matches the import_string
+        # We strip whitespace to ensure a clean match
+        new_lines = [line for line in lines if line.strip() != import_string.strip()]
+
+        with open(init_file_path, 'w') as file:
+            file.writelines(new_lines)
+        
+        print(f"Removed {import_string} from {init_file_path}")
+
     def genML(self, model: str):
+        metaomni_dir = self._get_metaomni_path()
+        os.makedirs(metaomni_dir, exist_ok=True)
         class_name_prompt = f"""Write a succinct pythonic class name for a model with name {model}, putting the name between the XML tags <name>Insert Class Name of Model Here</name>"""
         class_name = self.extract_name(self.gen(class_name_prompt))
         
@@ -115,16 +153,28 @@ print(class_name, accuracy)"""
         filename = self.extract_name(self.gen(filename_prompt))
         
         import_string = f"from metaomni.{filename.split('.py')[0]} import *"
-        
-        prompt = f"""Write a {model} classifier in the style of SciKit learn, with a {class_name} class that implements the methods fit(self, X_train, y_train) and predict(self, X_test)"""
+        prompt = f"""Write a {model} classifier in the style of SciKit learn, with a {class_name} class that implements the methods fit(self, X_train, y_train) and predict(self, X_test).
+
+        IMPORTANT: Put ALL your code in a single markdown code block. Format it exactly like this:
+
+        ```python
+        [your complete code here]
+        ```
+
+        Do not include any explanations, comments, or text outside the code block. Only return the code block with the complete implementation."""
         implementation = self.gen(prompt)
         
         snippets = self.extract_code_snippets(implementation)
-        self.save_first_snippet(snippets, 'metaomni/' + filename)
-        self.add_import_to_init('metaomni/__init__.py', import_string)
-        #NOTE: Move this to the execute file
-        # self.execute(filename, class_name, model, count=1)
-        return (filename, class_name)
+        filepath = self._get_metaomni_path(filename)
+        
+        if self.save_first_snippet(snippets, filepath):
+            init_file_path = self._get_metaomni_path('__init__.py')
+            self.add_import_to_init(init_file_path, import_string)
+            if self.execute(filename, class_name, model, count=1):                
+                return (filename, class_name, model)
+            else:
+                self.remove_import_from_init(init_file_path, import_string)
+        return None
 
     def parallel_genML(self, prompt_list):
         with concurrent.futures.ThreadPoolExecutor() as executor:
