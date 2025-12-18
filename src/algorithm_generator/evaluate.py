@@ -10,13 +10,13 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support, con
 
 def evaluate_model(model, dataset_name, test_size=0.2):
     if dataset_name == "Iris":
-        data = load_iris(return_X_y=True)
+        X, y = load_iris(return_X_y=True)
     elif dataset_name == "Wine":
-        data = load_wine()
+        X, y = load_wine(return_X_y=True)
     elif dataset_name == "Breast Cancer":
-        data = load_breast_cancer()
+        X, y = load_breast_cancer(return_X_y=True)
     elif dataset_name == "Digits":
-        data = load_digits()
+        X, y = load_digits(return_X_y=True)
     elif dataset_name == "Diabetes":
         data = load_diabetes()
     elif dataset_name == "California Housing":
@@ -32,7 +32,6 @@ def evaluate_model(model, dataset_name, test_size=0.2):
     else:
         raise ValueError(f"Unknown dataset: {dataset_name}")
         
-    X, y = data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
     
     # Fit the model
@@ -78,13 +77,18 @@ from sklearn.datasets import load_iris, load_wine, load_breast_cancer, load_digi
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, r2_score
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator, clone
+from sklearn.utils.multiclass import type_of_target
 from typing import List, Tuple, Dict, Union
+import importlib.util
+import inspect
+import os
 
 class BenchmarkSuite:
-    def __init__(self, test_size: float = 0.2, random_state: int = 42):
+    def __init__(self, dataset_names=None, test_size: float = 0.2, random_state: int = 42):
         self.test_size = test_size
         self.random_state = random_state
+        self.dataset_names = dataset_names or ["Iris", "Wine", "Breast Cancer", "Digits"]
         self.datasets = self._load_datasets()
         self.results = {}
 
@@ -99,7 +103,8 @@ class BenchmarkSuite:
         }
 
         split_datasets = {}
-        for name, (X, y) in datasets.items():
+        for name in self.dataset_names:
+            X, y = datasets[name]
             X_train, X_test, y_train, y_test = train_test_split(
                 X, y, test_size=self.test_size, random_state=self.random_state
             )
@@ -110,63 +115,35 @@ class BenchmarkSuite:
         
         return split_datasets
 
-    def run_benchmark(self, models: List[BaseEstimator]) -> Dict[str, Dict[str, float]]:
+    def run_benchmark(self, models: List[BaseEstimator], logging:bool = False) -> Dict[str, Dict[str, float]]:
         for model in models:
             model_name = model.__class__.__name__
             self.results[model_name] = {}
 
             for dataset_name, (X_train, X_test, y_train, y_test) in self.datasets.items():
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-                
-                if dataset_name in ['California Housing', 'Olivetti Faces']:
-                    score = r2_score(y_test, y_pred)
-                    metric = 'R2 Score'
-                else:
-                    score = accuracy_score(y_test, y_pred)
-                    metric = 'Accuracy'
-                
-                self.results[model_name][dataset_name] = {metric: score}
+                try:
+                    fresh_model = clone(model)
+                    y_type = type_of_target(y_train)
+                    is_regression = y_type in ("continuous", "continuous-multioutput")
+                    # is_classification = y_type in ("binary", "multiclass")
+
+                    fresh_model.fit(X_train, y_train)
+                    y_pred = fresh_model.predict(X_test)
+
+                    if is_regression:
+                        score = r2_score(y_test, y_pred)
+                        self.results[model_name][dataset_name] = {"R2": score}
+                    # elif is_classification:
+                    else:
+                        score = accuracy_score(y_test, y_pred)
+                        self.results[model_name][dataset_name] = {"Accuracy": score}
+                except Exception as e:
+                    if logging:
+                        msg = f"{model_name} failed on {dataset_name}: {type(e).__name__}: {e}"
+                        print(msg)
+                        self.results[model_name][dataset_name] = {"error": msg}
 
         return self.results
-
-    def execute(filename, class_name, model, count=1):
-        if count > 2:
-            try:
-                os.remove(filename)
-                return
-            except:
-                pass
-        
-        EXECUTION_STRINGS = f"""importlib.reload(metaomni)
-    ml_model = metaomni.{filename.split('.py')[0]}.{class_name}()
-    ml_model.fit(x_train, y_train)
-    preds = ml_model.predict(x_test)
-    accuracy = accuracy_score(y_test, preds)
-    print(class_name, accuracy)"""
-        
-        try:
-            exec(EXECUTION_STRINGS)
-        except Exception as e:
-            error_message = traceback.format_exc()
-            print("Hit error: ", error_message)
-            
-            prompt = f"""
-            Existing code:
-            {open(f'metaomni/{filename}', 'r').read()}
-        
-            Error message on original execution:
-            {e}
-        
-            Full traceback:
-            {error_message}
-        
-            Given the original code and this error, rewrite a {model} classifier in the style of SciKit learn, with a {class_name} class that implements the methods fit(self, X_train, y_train) and predict(self, X_test)"""
-            implementation = gen(prompt)
-            
-            snippets = extract_code_snippets(implementation)
-            save_first_snippet(snippets, 'metaomni/' + filename)
-            execute(filename, class_name, model, count+1)
 
     def print_results(self):
         for model, datasets in self.results.items():
@@ -174,6 +151,171 @@ class BenchmarkSuite:
             for dataset, scores in datasets.items():
                 for metric, score in scores.items():
                     print(f"  {dataset} - {metric}: {score:.4f}")
+    
+    def print_table(self):
+        datasets = list(self.datasets.keys())
+        models = list(self.results.keys())
+
+        colw = max(12, max(len(d) for d in datasets) + 2)
+        roww = max(24, max(len(m) for m in models) + 2)
+
+        header = "Model".ljust(roww) + "".join(d.ljust(colw) for d in datasets)
+        print(header)
+        print("-" * len(header))
+
+        for model_name in models:
+            row = model_name.ljust(roww)
+
+            for dataset_name in datasets:
+                cell = self.results[model_name].get(dataset_name, {})
+
+                if "Accuracy" in cell:
+                    val = cell["Accuracy"]
+                    row += f"{val:.4f}".ljust(colw)
+                elif "R2 Score" in cell:
+                    # models might never perform well on regression datasets bc we ask them to be classifieres
+                    val = cell["R2 Score"]
+                    row += f"{val:.4f}".ljust(colw)
+                else:
+                    row += "ERR".ljust(colw)
+            print(row)
+
+    def _get_metric_label(self, dataset_name: str):
+        for model_results in self.results.values():
+            cell = model_results.get(dataset_name, {})
+            if "Accuracy" in cell:
+                return "Accuracy"
+            if "R2" in cell:
+                return "R²"
+        return "Metric"
+    
+    def save_latex_table_multirow(self, filepath: str, caption: str = "Benchmark results", label: str = "tab:benchmark"):
+        import os
+
+        datasets = list(self.datasets.keys())
+        models = list(self.results.keys())
+
+        metric_labels = {d: self._get_metric_label(d) for d in datasets}
+
+        os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
+
+        with open(filepath, "w") as f:
+            f.write("\\begin{table}[ht]\n")
+            f.write("\\centering\n")
+            f.write(f"\\caption{{{caption}}}\n")
+            f.write(f"\\label{{{label}}}\n")
+
+            # Column format
+            f.write("\\begin{tabular}{l" + "c" * len(datasets) + "}\n")
+            f.write("\\toprule\n")
+
+            # Header row 1: dataset names
+            header1 = "Model"
+            for d in datasets:
+                header1 += f" & \\multicolumn{{1}}{{c}}{{{d}}}"
+            f.write(header1 + " \\\\\n")
+
+            # Header row 2: metric labels
+            header2 = " "
+            for d in datasets:
+                header2 += f" & {metric_labels[d]}"
+            f.write(header2 + " \\\\\n")
+
+            f.write("\\midrule\n")
+
+            # Table body
+            for model_name in models:
+                row = model_name
+                for d in datasets:
+                    cell = self.results.get(model_name, {}).get(d, {})
+
+                    if "Accuracy" in cell:
+                        row += f" & {cell['Accuracy']:.4f}"
+                    elif "R2" in cell:
+                        row += f" & {cell['R2']:.4f}"
+                    else:
+                        row += " & --"
+                f.write(row + " \\\\\n")
+
+            f.write("\\bottomrule\n")
+            f.write("\\end{tabular}\n")
+            f.write("\\end{table}\n")
+
+        print(f"Saved LaTeX table with multirow header to: {filepath}")
+        print(f"!!!Make sure to include \\usepackage{{booktabs}}")
+
+
+def load_models_from_directory(models_dir: str, logging: bool=False):
+    """
+    Dynamically loads sklearn-style models from all .py files in a directory.
+    Returns: list of model instances
+    """
+    models = []
+
+    for filename in sorted(os.listdir(models_dir)):
+        if not filename.endswith(".py"):
+            continue
+        if filename == "__init__.py":
+            continue
+
+        file_path = os.path.join(models_dir, filename)
+        module_name = os.path.splitext(filename)[0]
+
+        spec = importlib.util.spec_from_file_location(module_name, file_path)
+        if spec is None or spec.loader is None:
+            continue
+
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        for name, obj in inspect.getmembers(module, inspect.isclass):
+            if obj.__module__ != module.__name__:
+                continue
+
+            # look like a sklearn estimator
+            if not hasattr(obj, "fit") or not hasattr(obj, "predict"):
+                continue
+
+            try: # try instantiating
+                instance = obj()
+                models.append(instance)
+                if logging: print(f"Loaded model: {obj.__name__} from {filename}")
+            except Exception as e:
+                if logging: print(f"Skipped {obj.__name__} (could not instantiate): {e}")
+
+    return models
+
+
+def main():
+    logging = False
+    models_dir = "/Users/annikaks/Desktop/omega/src/algorithm_generator/metaomni"
+    print("Loading models from:", models_dir)
+    print(f"{len(os.listdir(models_dir))} Files:", os.listdir(models_dir)) 
+
+    suite = BenchmarkSuite(
+        dataset_names=["Iris", "Wine", "Breast Cancer", "Digits", "California Housing"],
+    )
+
+    models = load_models_from_directory(models_dir, logging)
+
+    if not models:
+        print("No valid models found.")
+        return
+
+    suite.run_benchmark(models, logging)
+    suite.print_table()
+
+    suite.save_latex_table_multirow(
+        filepath="src/algorithm_generator/results/benchmark_multirow.tex",
+        caption="MetaOmni-generated models evaluated on classification and regression datasets.",
+        label="tab:metaomni-mixed-benchmark"
+    )
+
+
+
+if __name__ == "__main__":
+    main()
+
 
 # suite = BenchmarkSuite()
 # models = [mo.MultiLevelAbstractionKNN()]
