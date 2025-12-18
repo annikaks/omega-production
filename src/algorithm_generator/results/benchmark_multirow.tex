@@ -1,0 +1,77 @@
+\begin{table}[ht]
+\centering
+\caption{MetaOmni-generated models evaluated on classification and regression datasets.}
+\label{tab:metaomni-mixed-benchmark}
+\begin{tabular}{lcccc}
+\toprule
+Model & \multicolumn{1}{c}{Iris} & \multicolumn{1}{c}{Wine} & \multicolumn{1}{c}{Breast Cancer} & \multicolumn{1}{c}{Digits} \\
+  & Accuracy & Accuracy & Accuracy & Accuracy \\
+\midrule
+EntropyGuidedDynamicNet & 0.7000 & 0.9167 & 0.8860 & 0.5833 \\
+SimilarityAttention & -- & -- & -- & -- \\
+AdaptiveComplexityBagger & -- & -- & -- & -- \\
+AdaptiveComplexityNet & -- & -- & 0.9737 & 0.9694 \\
+AdaptiveLocalPruner & 0.9000 & 1.0000 & 0.9737 & 0.9694 \\
+BiasVarianceBalancingNet & -- & -- & -- & -- \\
+BVOptimizedBagger & 1.0000 & 0.9167 & 0.9474 & 0.9417 \\
+CompressionGuidedBagger & -- & -- & -- & -- \\
+CompressionAwareLoss & 1.0000 & 1.0000 & 0.9737 & 0.9778 \\
+CompressionDrivenLearner & 0.9667 & 1.0000 & 0.9649 & 0.9667 \\
+DimensionalityAwareForest & 1.0000 & 1.0000 & 0.9737 & 0.9556 \\
+DimAwareConnector & -- & -- & -- & -- \\
+DirectionalEnsembleTrees & 0.9333 & 0.9722 & 0.8772 & 0.5750 \\
+DirectionalTree & -- & -- & -- & -- \\
+DirectionalFeatureExtractor & -- & -- & -- & -- \\
+EntropyGuidedBagger & -- & -- & -- & -- \\
+GranularityAdaptiveBagger & -- & -- & -- & -- \\
+HybridDiscreteContForest & -- & -- & -- & -- \\
+HingeSVM & -- & -- & -- & -- \\
+HybridNeuronModel & 0.6333 & 0.6944 & 0.9825 & 0.1139 \\
+MultiLevelAbstractionTree & 1.0000 & 0.9444 & 0.9474 & 0.4722 \\
+MultiResolutionPathwayFusion & 1.0000 & -- & -- & 0.9611 \\
+MultiLevelAbstractionNet & -- & -- & -- & -- \\
+AdaptiveAbstractionForest & 1.0000 & 0.9722 & 0.9561 & 0.9583 \\
+AdaptiveAbstractionTree & 1.0000 & 0.9444 & 0.9386 & 0.8722 \\
+AbstractionGuidedEnsembleNet & 1.0000 & 1.0000 & 0.9825 & 0.9722 \\
+AdaptiveAbstractionNetClassifier & 1.0000 & 1.0000 & 0.9825 & 0.9750 \\
+AdaptiveDensityCompressedKNN & -- & 0.3889 & 0.9298 & 0.8556 \\
+AdaptiveKernelComplexity & 0.4000 & 0.4722 & 0.6228 & 0.0917 \\
+AdaptiveRandomnessNetwork & 1.0000 & 1.0000 & 0.9649 & 0.9444 \\
+BaggedDecisionTrees & -- & -- & -- & -- \\
+BiasVarianceBalancer & 1.0000 & 0.9444 & 0.9298 & 0.8722 \\
+BiasVarianceOptimizedKNNEnsemble & 0.7000 & 0.7778 & 0.9561 & 0.1861 \\
+DynamicBiasVarianceForest & 1.0000 & 0.9722 & 0.9649 & 0.8556 \\
+CompressibilityAdaptiveLR & -- & -- & 0.9825 & -- \\
+CompressionGuidedForest & 1.0000 & 0.9722 & 0.9649 & 0.9833 \\
+CompressionGuidedPruner & -- & -- & -- & -- \\
+CompressibilitySimilarityKNN & 0.8333 & 0.3611 & 0.8596 & 0.4417 \\
+DecisionTreeClassifier & -- & -- & -- & -- \\
+DimensionalityAdaptiveConnector & -- & -- & 0.3772 & -- \\
+DimAwareForest & 1.0000 & 1.0000 & 0.9649 & 0.9806 \\
+DimAwareSplitInteractionModel & -- & -- & -- & -- \\
+DirectionalActivationNet & 0.3000 & 0.3889 & 0.6228 & 0.0750 \\
+DirectionalForest & 1.0000 & 1.0000 & 0.9561 & 0.9806 \\
+DirectionalWeightedKNN & 1.0000 & 0.9444 & 0.9474 & 0.9750 \\
+DiscreteContHybridNeuron & 0.9667 & 0.9722 & 0.9561 & 0.6944 \\
+EntropyGuidedForestGrowth & 0.9667 & 0.9167 & 0.9474 & 0.7750 \\
+EntropyGuidedKNN & 1.0000 & 0.9444 & 0.9474 & 0.9722 \\
+FractalDimensionAdaptiveKNN & -- & -- & -- & -- \\
+GradientBoostingMachine & 0.6333 & 0.7222 & 0.9561 & 0.1611 \\
+HybridKNNClassifier & 1.0000 & 0.9444 & 0.9474 & 0.9722 \\
+InteractionAwareKNN & 1.0000 & 0.9444 & 0.9561 & 0.9667 \\
+KNN & -- & -- & -- & -- \\
+KNearestNeighbors & -- & -- & -- & -- \\
+LinearDiscriminantAnalysis & -- & -- & -- & -- \\
+CustomPCAMultiLevelKNN & 0.9000 & 0.9722 & 0.9474 & 0.9667 \\
+MultiLevelAbstractionKNN & 0.9000 & 0.9722 & 0.9474 & 0.9667 \\
+NaiveBayesClassifier & -- & -- & -- & -- \\
+NeuralNetClassifier & -- & -- & -- & -- \\
+PerceptronClassifier & -- & -- & -- & -- \\
+QuadraticDiscriminantAnalysis & -- & -- & -- & -- \\
+DecisionTree & -- & -- & -- & -- \\
+RandomForestModel & -- & -- & -- & -- \\
+BalancedSimDissimKNN & 1.0000 & 0.9444 & 0.9561 & 0.9750 \\
+SimilarityFeatureFuser & 0.1667 & 0.0000 & 0.2105 & 0.1139 \\
+\bottomrule
+\end{tabular}
+\end{table}
