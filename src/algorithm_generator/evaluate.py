@@ -144,6 +144,64 @@ class BenchmarkSuite:
                         self.results[model_name][dataset_name] = {"error": msg}
 
         return self.results
+    
+    def compute_aggregate_relative_score_strict(self):
+        """
+        !! If I randomly pick one of these datasets, how close is this model to the best-performing model on that dataset?
+        n_{m,d} = (s_{m,d} - min_d) / (max_d - min_d)  # s_{m,d} = models accuracy on dataset d
+        RelAgg_m = (1 / |D|) * Σ_d n_{m,d}
+        
+        Strict aggregate score:
+        - normalize model scores into [0,1] using min-max over successful models (/dataset)
+        - any ERR/missing scores = 0.0 for that dataset
+        - Aggregate is the mean normalized score across ALL datasets (equal weight)
+
+        Returns:
+        aggregate: dict[model_name] -> float
+        norm_by_dataset: dict[dataset_name] -> dict[model_name] -> float
+        """
+        datasets = list(self.datasets.keys())
+        models = list(self.results.keys())
+
+        raw_by_dataset = {d: {} for d in datasets}
+
+        for d in datasets:
+            for m in models:
+                cell = self.results.get(m, {}).get(d, {})
+                if "Accuracy" in cell:
+                    raw_by_dataset[d][m] = float(cell["Accuracy"])
+                elif "R2" in cell:
+                    raw_by_dataset[d][m] = float(cell["R2"])
+                # else: missing/ERR
+
+        # normalize 
+        norm_by_dataset = {d: {} for d in datasets}
+
+        for d in datasets:
+            vals = list(raw_by_dataset[d].values())
+            if not vals:
+                # nobody succeeded -> everyone gets 0 by strict policy
+                continue
+
+            mn, mx = min(vals), max(vals)
+            denom = mx - mn
+
+            for m, s in raw_by_dataset[d].items():
+                if denom == 0:
+                    norm = 1.0 
+                else:
+                    norm = (s - mn) / denom
+                norm_by_dataset[d][m] = norm
+
+        aggregate = {}
+        for m in models:
+            total = 0.0
+            for d in datasets:
+                total += norm_by_dataset[d].get(m, 0.0)
+            aggregate[m] = total / len(datasets) if datasets else 0.0
+
+        return aggregate, norm_by_dataset
+
 
     def print_results(self):
         for model, datasets in self.results.items():
@@ -156,29 +214,36 @@ class BenchmarkSuite:
         datasets = list(self.datasets.keys())
         models = list(self.results.keys())
 
+        aggregate, _ = self.compute_aggregate_relative_score_strict()
+
         colw = max(12, max(len(d) for d in datasets) + 2)
         roww = max(24, max(len(m) for m in models) + 2)
 
-        header = "Model".ljust(roww) + "".join(d.ljust(colw) for d in datasets)
+        header = (
+            "Model".ljust(roww)
+            + "".join(d.ljust(colw) for d in datasets)
+            + "Aggregate".ljust(colw)
+        )
         print(header)
         print("-" * len(header))
+        models = sorted(models, key=lambda m: aggregate.get(m, 0.0), reverse=True)
 
         for model_name in models:
             row = model_name.ljust(roww)
 
             for dataset_name in datasets:
-                cell = self.results[model_name].get(dataset_name, {})
+                cell = self.results.get(model_name, {}).get(dataset_name, {})
 
                 if "Accuracy" in cell:
-                    val = cell["Accuracy"]
-                    row += f"{val:.4f}".ljust(colw)
-                elif "R2 Score" in cell:
-                    # models might never perform well on regression datasets bc we ask them to be classifieres
-                    val = cell["R2 Score"]
-                    row += f"{val:.4f}".ljust(colw)
+                    row += f"{cell['Accuracy']:.4f}".ljust(colw)
+                elif "R2" in cell:
+                    row += f"{cell['R2']:.4f}".ljust(colw)
                 else:
                     row += "ERR".ljust(colw)
+
+            row += f"{aggregate[model_name]:.3f}".ljust(colw)
             print(row)
+
 
     def _get_metric_label(self, dataset_name: str):
         for model_results in self.results.values():
@@ -189,52 +254,106 @@ class BenchmarkSuite:
                 return "R²"
         return "Metric"
     
-    def save_latex_table_multirow(self, filepath: str, caption: str = "Benchmark results", label: str = "tab:benchmark"):
-        import os
-
+    def save_latex_table_multirow( self, filepath: str, caption: str = "Benchmark results", label: str = "tab:benchmark",):
         datasets = list(self.datasets.keys())
         models = list(self.results.keys())
+
+        raw_by_dataset = {d: {} for d in datasets}
+        for d in datasets:
+            for m in models:
+                cell = self.results.get(m, {}).get(d, {})
+                if "Accuracy" in cell:
+                    raw_by_dataset[d][m] = float(cell["Accuracy"])
+                elif "R2" in cell:
+                    raw_by_dataset[d][m] = float(cell["R2"])
+
+        norm_by_dataset = {d: {} for d in datasets}
+        for d in datasets:
+            vals = list(raw_by_dataset[d].values())
+            if not vals:
+                continue
+            mn, mx = min(vals), max(vals)
+            denom = mx - mn
+            for m, s in raw_by_dataset[d].items():
+                norm_by_dataset[d][m] = 1.0 if denom == 0 else (s - mn) / denom
+
+        aggregate = {}
+        for m in models:
+            total = 0.0
+            for d in datasets:
+                total += norm_by_dataset[d].get(m, 0.0)
+            aggregate[m] = total / len(datasets) if datasets else 0.0
+
+        # sort models by aggregate score (best first)
+        models = sorted(models, key=lambda mn: aggregate.get(mn, 0.0), reverse=True)
+
+        cls_datasets = []
+        reg_datasets = []
+        for d in datasets:
+            # TODO: add to this list if you add more regression datasets
+            if d in {"California Housing", "Olivetti Faces", "Diabetes"}:
+                reg_datasets.append(d)
+            else:
+                cls_datasets.append(d)
 
         metric_labels = {d: self._get_metric_label(d) for d in datasets}
 
         os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
 
         with open(filepath, "w") as f:
+            f.write("% Auto-generated by BenchmarkSuite.save_latex_table_multirow\n")
+            f.write("% Requires LaTeX packages: booktabs, multirow\n\n")
+
             f.write("\\begin{table}[ht]\n")
             f.write("\\centering\n")
             f.write(f"\\caption{{{caption}}}\n")
             f.write(f"\\label{{{label}}}\n")
 
-            # Column format
-            f.write("\\begin{tabular}{l" + "c" * len(datasets) + "}\n")
+            f.write("\\begin{tabular}{l" + "c" * (len(datasets) + 1) + "}\n")
             f.write("\\toprule\n")
 
-            # Header row 1: dataset names
             header1 = "Model"
-            for d in datasets:
-                header1 += f" & \\multicolumn{{1}}{{c}}{{{d}}}"
+            if cls_datasets:
+                header1 += f" & \\multicolumn{{{len(cls_datasets)}}}{{c}}{{Classification}}"
+            if reg_datasets:
+                header1 += f" & \\multicolumn{{{len(reg_datasets)}}}{{c}}{{Regression}}"
+            header1 += " & \\multicolumn{1}{c}{RelAgg}"
             f.write(header1 + " \\\\\n")
 
-            # Header row 2: metric labels
+            col_start = 2 
+            if cls_datasets:
+                f.write(f"\\cmidrule(lr){{{col_start}-{col_start + len(cls_datasets) - 1}}}\n")
+                col_start += len(cls_datasets)
+            if reg_datasets:
+                f.write(f"\\cmidrule(lr){{{col_start}-{col_start + len(reg_datasets) - 1}}}\n")
+                col_start += len(reg_datasets)
+
             header2 = " "
-            for d in datasets:
-                header2 += f" & {metric_labels[d]}"
+            for d in cls_datasets + reg_datasets:
+                header2 += f" & \\multicolumn{{1}}{{c}}{{{d}}}"
+            header2 += " & "
             f.write(header2 + " \\\\\n")
+
+            header3 = " "
+            for d in cls_datasets + reg_datasets:
+                header3 += f" & {metric_labels[d]}"
+            header3 += " & Rel"
+            f.write(header3 + " \\\\\n")
 
             f.write("\\midrule\n")
 
-            # Table body
             for model_name in models:
                 row = model_name
-                for d in datasets:
+                for d in cls_datasets + reg_datasets:
                     cell = self.results.get(model_name, {}).get(d, {})
-
                     if "Accuracy" in cell:
                         row += f" & {cell['Accuracy']:.4f}"
                     elif "R2" in cell:
                         row += f" & {cell['R2']:.4f}"
                     else:
                         row += " & --"
+
+                row += f" & {aggregate.get(model_name, 0.0):.3f}"
                 f.write(row + " \\\\\n")
 
             f.write("\\bottomrule\n")
@@ -242,7 +361,7 @@ class BenchmarkSuite:
             f.write("\\end{table}\n")
 
         print(f"Saved LaTeX table with multirow header to: {filepath}")
-        print(f"!!!Make sure to include \\usepackage{{booktabs}}")
+        print("!!!Make sure to include \\usepackage{booktabs} and \\usepackage{multirow}")
 
 
 def load_models_from_directory(models_dir: str, logging: bool=False):
