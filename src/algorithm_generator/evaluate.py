@@ -1,57 +1,166 @@
-from sklearn.datasets import load_iris, load_wine, load_breast_cancer, load_digits, fetch_openml
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-from data_loader import load_classification_datasets
+# thread caps
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
+import time
+import inspect
+import importlib.util
+import warnings
+from dataclasses import dataclass
+from typing import Any, Optional, List, Tuple, Dict
 
 import numpy as np
-from sklearn.metrics import (
-    accuracy_score,
-)
+import pandas as pd
 
+from joblib import Parallel, delayed
 from sklearn.base import BaseEstimator, clone
-from typing import List, Tuple, Dict
-import importlib.util
-import inspect
-import os
+from sklearn.metrics import accuracy_score
+from sklearn.exceptions import ConvergenceWarning
+from scipy.sparse import SparseEfficiencyWarning
+
+from data_loader import load_classification_datasets
+
+
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
+warnings.filterwarnings("ignore", category=SparseEfficiencyWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn.manifold._isomap")
+
+
+@dataclass(frozen=True)
+class BenchmarkTask:
+    model: Any
+    model_name: str
+    dataset_name: str
+    X_train: np.ndarray
+    X_test: np.ndarray
+    y_train: np.ndarray
+    y_test: np.ndarray
+
+
+def eval_one_benchmark_task(
+    task: BenchmarkTask,
+) -> Tuple[str, str, Dict[str, float], Optional[str], Dict[str, float]]:
+    """
+    Returns:
+      (model_name, dataset_name, cell_dict, error_msg_or_None, stats_dict)
+
+    cell_dict:
+      {"Accuracy": float} on success
+      {"error": "..."} on failure
+    """
+    t0 = time.perf_counter()
+    fit_s: Optional[float] = None
+    pred_s: Optional[float] = None
+
+    try:
+        fresh_model = clone(task.model)
+
+        X_train = np.asarray(task.X_train)
+        X_test = np.asarray(task.X_test)
+
+        t_fit0 = time.perf_counter()
+        fresh_model.fit(X_train, task.y_train)
+        fit_s = time.perf_counter() - t_fit0
+
+        t_pred0 = time.perf_counter()
+        y_pred = fresh_model.predict(X_test)
+        pred_s = time.perf_counter() - t_pred0
+
+        score = accuracy_score(task.y_test, y_pred)
+
+        total_s = time.perf_counter() - t0
+        stats = {
+            "total_s": float(total_s),
+            "fit_s": float(fit_s),
+            "pred_s": float(pred_s),
+            "timed_out": 0.0, 
+        }
+        return (task.model_name, task.dataset_name, {"Accuracy": float(score)}, None, stats)
+
+    except Exception as e:
+        total_s = time.perf_counter() - t0
+        msg = f"{task.model_name} failed on {task.dataset_name}: {type(e).__name__}: {e}"
+        stats = {
+            "total_s": float(total_s),
+            "fit_s": float(fit_s) if fit_s is not None else -1.0,
+            "pred_s": float(pred_s) if pred_s is not None else -1.0,
+            "timed_out": 0.0,
+        }
+        return (task.model_name, task.dataset_name, {"error": msg}, msg, stats)
 
 
 class BenchmarkSuite:
-    def __init__(self, dataset_names=None, test_size: float = 0.2, random_state: int = 42, logging: bool = False, debugging: bool = False):
+    def __init__(
+        self,
+        dataset_names: Optional[List[str]] = None,
+        test_size: float = 0.2,
+        random_state: int = 42,
+        logging: bool = False,
+        debugging: bool = False,
+    ):
         self.test_size = test_size
         self.random_state = random_state
         self.dataset_names = dataset_names or ["Iris", "Wine", "Breast Cancer", "Digits"]
+
         self.datasets = load_classification_datasets(
             dataset_names=self.dataset_names,
             test_size=self.test_size,
             random_state=self.random_state,
             logging=logging,
         )
+
         self.logging = logging
         self.debugging = debugging
-        self.results: Dict[str, Dict[str, Dict[str, float]]] = {}
 
-    def run_benchmark(self, models: List[BaseEstimator]) -> Dict[str, Dict[str, float]]:
+        self.results: Dict[str, Dict[str, Dict[str, float]]] = {}
+        self.runtime_stats: Dict[str, Dict[str, Dict[str, float]]] = {}
+
+    def run_benchmark(self, models: List[BaseEstimator], n_jobs: int = 4) -> Dict[str, Dict[str, Dict[str, float]]]:
+        # initialize results so downstream printing works
+        self.results = {m.__class__.__name__: {} for m in models}
+        self.runtime_stats = {}
+
+        tasks: List[BenchmarkTask] = []
         for model in models:
             model_name = model.__class__.__name__
-            self.results[model_name] = {}
-
             for dataset_name, (X_train, X_test, y_train, y_test) in self.datasets.items():
-                try:
-                    fresh_model = clone(model)
-                    fresh_model.fit(X_train, y_train)
-                    y_pred = fresh_model.predict(X_test)
-                    score = accuracy_score(y_test, y_pred)
-                    self.results[model_name][dataset_name] = {"Accuracy": score}
-                except Exception as e:
-                    msg = f"{model_name} failed on {dataset_name}: {type(e).__name__}: {e}"
-                    if self.logging and self.debugging:
-                        print(msg)
-                    self.results[model_name][dataset_name] = {"error": msg}
+                tasks.append(
+                    BenchmarkTask(
+                        model=model,
+                        model_name=model_name,
+                        dataset_name=dataset_name,
+                        X_train=X_train,
+                        X_test=X_test,
+                        y_train=y_train,
+                        y_test=y_test,
+                    )
+                )
 
-                if self.logging: print(f"Evaluated {model_name} on {dataset_name}")
+        outputs = Parallel(n_jobs=n_jobs, backend="threading")(
+            delayed(eval_one_benchmark_task)(t) for t in tasks
+        )
+
+        failed = 0
+        for model_name, dataset_name, cell, err, stats in outputs:
+            self.results.setdefault(model_name, {})
+            self.results[model_name][dataset_name] = cell
+
+            self.runtime_stats.setdefault(model_name, {})
+            self.runtime_stats[model_name][dataset_name] = stats
+
+            if err is not None:
+                failed += 1
+                if self.logging and self.debugging:
+                    print(err)
+
+        if self.logging:
+            total = len(tasks)
+            print(f"Benchmark done: {total - failed}/{total} succeeded, {failed} failed")
 
         return self.results
 
@@ -59,14 +168,14 @@ class BenchmarkSuite:
         datasets = list(self.datasets.keys())
         models = list(self.results.keys())
 
-        raw_by_dataset = {d: {} for d in datasets}
+        raw_by_dataset: Dict[str, Dict[str, float]] = {d: {} for d in datasets}
         for d in datasets:
             for m in models:
                 cell = self.results.get(m, {}).get(d, {})
                 if "Accuracy" in cell:
                     raw_by_dataset[d][m] = float(cell["Accuracy"])
 
-        norm_by_dataset = {d: {} for d in datasets}
+        norm_by_dataset: Dict[str, Dict[str, float]] = {d: {} for d in datasets}
         for d in datasets:
             vals = list(raw_by_dataset[d].values())
             if not vals:
@@ -76,7 +185,7 @@ class BenchmarkSuite:
             for m, s in raw_by_dataset[d].items():
                 norm_by_dataset[d][m] = 1.0 if denom == 0 else (s - mn) / denom
 
-        aggregate = {}
+        aggregate: Dict[str, float] = {}
         for m in models:
             total = 0.0
             for d in datasets:
@@ -101,9 +210,10 @@ class BenchmarkSuite:
         )
         print(header)
         print("-" * len(header))
-        models = sorted(models, key=lambda m: aggregate.get(m, 0.0), reverse=True)
 
-        for model_name in models:
+        models_sorted = sorted(models, key=lambda m: aggregate.get(m, 0.0), reverse=True)
+
+        for model_name in models_sorted:
             row = model_name.ljust(roww)
             for dataset_name in datasets:
                 cell = self.results.get(model_name, {}).get(dataset_name, {})
@@ -114,12 +224,28 @@ class BenchmarkSuite:
             row += f"{aggregate.get(model_name, 0.0):.3f}".ljust(colw)
             print(row)
 
-    def save_latex_table_multirow(self, filepath: str, caption: str = "Benchmark results", label: str = "tab:benchmark"):
+    def summarize_runtime(self):
+        summary: Dict[str, Dict[str, float]] = {}
+        for model, by_ds in self.runtime_stats.items():
+            times = [v["total_s"] for v in by_ds.values() if v.get("total_s", -1) >= 0]
+            summary[model] = {
+                "mean_total_s": float(np.mean(times)) if times else float("inf"),
+                "max_total_s": float(np.max(times)) if times else float("inf"),
+                "timeouts": 0,  # no enforced timeouts in this version
+            }
+        return summary
+
+    def save_latex_table_multirow(
+        self,
+        filepath: str,
+        caption: str = "Benchmark results",
+        label: str = "tab:benchmark",
+    ):
         datasets = list(self.datasets.keys())
         models = list(self.results.keys())
 
         aggregate, _ = self.compute_aggregate_relative_score_strict()
-        models = sorted(models, key=lambda mn: aggregate.get(mn, 0.0), reverse=True)
+        models_sorted = sorted(models, key=lambda mn: aggregate.get(mn, 0.0), reverse=True)
 
         os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
 
@@ -157,7 +283,7 @@ class BenchmarkSuite:
 
             f.write("\\midrule\n")
 
-            for model_name in models:
+            for model_name in models_sorted:
                 row = model_name
                 for d in datasets:
                     cell = self.results.get(model_name, {}).get(d, {})
@@ -173,11 +299,30 @@ class BenchmarkSuite:
             f.write("\\end{table}\n")
 
         print(f"Saved LaTeX table to: {filepath}")
-        print("!!!Make sure to include \\\\usepackage{booktabs} and \\\\usepackage{multirow}")
+        print(r"!!! Make sure to include \usepackage{booktabs} and \usepackage{multirow}")
+
+    def save_runtime_stats_csv(self, filepath: str):
+        import csv
+        os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
+
+        with open(filepath, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["model", "dataset", "total_s", "fit_s", "pred_s", "timed_out"])
+
+            for model_name, by_ds in self.runtime_stats.items():
+                for dataset_name, stats in by_ds.items():
+                    w.writerow([
+                        model_name,
+                        dataset_name,
+                        stats.get("total_s", ""),
+                        stats.get("fit_s", ""),
+                        stats.get("pred_s", ""),
+                        stats.get("timed_out", ""),
+                    ])
 
 
 def load_models_from_directory(models_dir: str, logging: bool = False):
-    models = []
+    models: List[BaseEstimator] = []
 
     for filename in sorted(os.listdir(models_dir)):
         if not filename.endswith(".py"):
@@ -214,42 +359,55 @@ def load_models_from_directory(models_dir: str, logging: bool = False):
 
 
 def main():
-    logging = True
-    
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    metaomni_dir = os.path.join(current_dir, "metaomni")
-    models_dir = [metaomni_dir]
+    logging = False
 
-    # SUPPORTED_DATASETS = ["Iris", "Wine", "Breast Cancer", "Digits", "Adult", "Bank Marketing", "Credit-G", "Phoneme", "Spambase", "Ionosphere", "Sonar", "Vehicle", "Glass"]
-    suite = BenchmarkSuite(dataset_names=[
-        "Iris",
-        "Breast Cancer",
-        "Adult",
-        "Credit-G",
-        "Vehicle",
-        "Glass",
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    metaomni_dir = os.path.join(current_dir, "metaomni/batch3")
+    models_dirs = [metaomni_dir]
+
+    suite = BenchmarkSuite(
+        dataset_names=[
+            "Iris",
+            "Breast Cancer",
+            "Credit-G",
+            "Phoneme",
+            "Vehicle",
+            "Glass",
         ],
         logging=logging,
         debugging=False,
     )
 
-    models = []
-    for dir in models_dir:
-        print(f"loading {len(os.listdir(dir))} files from {dir}") 
-        models.extend(load_models_from_directory(dir, logging))
+    models: List[BaseEstimator] = []
+    for d in models_dirs:
+        py_count = len([f for f in os.listdir(d) if f.endswith(".py")])
+        print(f"loading ~{py_count} .py files from {d}")
+        models.extend(load_models_from_directory(d, logging=logging))
 
     if not models:
         print("No valid models found.")
         return
 
-    suite.run_benchmark(models[:5])
+    suite.run_benchmark(models, n_jobs=4)
+
+    logs_dir = os.path.join(metaomni_dir, "evaluation_logs")
+    os.makedirs(logs_dir, exist_ok=True)
+
+    suite.save_runtime_stats_csv(os.path.join(logs_dir, "runtime_task_stats.csv"))
+
+    runtime_summary = suite.summarize_runtime()
+    pd.DataFrame.from_dict(runtime_summary, orient="index").to_csv(
+        os.path.join(logs_dir, "runtime_summary.csv")
+    )
+
     suite.print_table()
 
     suite.save_latex_table_multirow(
-        filepath=f"{current_dir}/results/benchmark_multirow_25_12_18.tex",
+        filepath=os.path.join(logs_dir, "benchmark_multirow.tex"),
         caption="MetaOmni-generated models evaluated on classification datasets.",
         label="tab:metaomni-classification-benchmark",
     )
+
 
 if __name__ == "__main__":
     main()
