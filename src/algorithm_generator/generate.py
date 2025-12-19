@@ -12,22 +12,31 @@ import anthropic
 from tqdm import tqdm
 
 import metaomni
-
+import threading
+import time
+import anthropic
+from anthropic import (
+    InternalServerError, 
+    APIConnectionError, 
+    RateLimitError, 
+    APIStatusError,
+)
 X, y = load_iris(return_X_y=True)
 
 x_train, x_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 
-# optional but often helpful
 scaler = StandardScaler()
 x_train = scaler.fit_transform(x_train)
 x_test = scaler.transform(x_test)
 
 class AlgoGen:
 
-    def __init__(self, anthropic_client: anthropic.Anthropic):
+    def __init__(self, anthropic_client: anthropic.Anthropic, log_file: str = "experiment_log.csv"):
         self.anthropic_client = anthropic_client
+        self.file_lock = threading.Lock()
+        self.log_file = log_file
     
     def _get_metaomni_path(self, filename=None):
         """Get the path to metaomni directory, optionally with a filename."""
@@ -38,24 +47,26 @@ class AlgoGen:
         return metaomni_dir
 
     def gen(self, prompt: str) -> str:
-        message = self.anthropic_client.messages.create(
-            model="claude-sonnet-4-5-20250929",
-            max_tokens=4000,
-            temperature=0,
-            system="You are a world-class research engineer.",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": prompt
-                        }
-                    ]
-                }
-            ]
-        )
-        return message.content[0].text
+        max_retries = 8 
+        for attempt in range(max_retries):
+            try:
+                message = self.anthropic_client.messages.create(
+                    model="claude-sonnet-4-5-20250929",
+                    max_tokens=4000,
+                    temperature=0,
+                    system="You are a world-class research engineer.",
+                    messages=[{"role": "user", "content": [{"type": "text", "text": prompt}]}]
+                )
+                return message.content[0].text
+            # claude overload handle
+            except (InternalServerError, APIConnectionError, RateLimitError, APIStatusError) as e:
+                if attempt == max_retries - 1:
+                    print(f"Final attempt failed. Error: {e}")
+                    raise e
+                
+                wait_time = (2 ** attempt) + 2 
+                print(f"Anthropic Overloaded (Attempt {attempt+1}/{max_retries}). Waiting {wait_time}s...")
+                time.sleep(wait_time)
 
     def extract_code_snippets(self, text: str) -> str:
         pattern = r'```(?:python)?\n(.*?)```'
@@ -83,13 +94,29 @@ class AlgoGen:
             return match.group(1)
         else:
             return None
+        
+    def log_experiment(self, model_idea, class_name, status, history):
+        import csv
+        log_file = self.log_file
+        
+        with self.file_lock:
+            file_exists = os.path.isfile(log_file)
+            with open(log_file, "a", newline="") as f:
+                writer = csv.writer(f)
+                if not file_exists:
+                    writer.writerow(["Model", "Class", "Status", "Retries", "Errors"])
+                error_summary = " | ".join([f"{h['attempt']}:{h['error']}" for h in history])
+                writer.writerow([model_idea, class_name, status, len(history), error_summary])
 
-    def execute(self, filename, class_name, model, count=1):
+    def execute(self, filename, class_name, model, count=1, history=None):
+        if history is None:
+            history = []
         filepath = self._get_metaomni_path(filename)
         if count > 2:
+            self.log_experiment(model, class_name, "FAILED", history)
             try:
                 os.remove(filepath)
-                return False  # Indicate failure - file was deleted
+                return False
             except:
                 pass
             return False
@@ -123,11 +150,13 @@ print("{class_name}", accuracy)
             }
 
             exec(EXECUTION_STRINGS, exec_globals)
-            return True  # Success - code executed without errors
+            self.log_experiment(model, class_name, "SUCCESS", history)
+            return True
         except Exception as e:
             error_message = traceback.format_exc()
+            error_type = type(e).__name__
             print("Hit error: ", error_message)
-            
+            history.append({"attempt": count, "error": error_type, "message": error_message})
             filepath = self._get_metaomni_path(filename)
             prompt = f"""
             Existing code:
@@ -148,63 +177,51 @@ print("{class_name}", accuracy)
             return self.execute(filename, class_name, model, count+1)
 
     def add_import_to_init(self, init_file_path, import_string):
-        # Read the current contents of the file
-        with open(init_file_path, 'r') as file:
-            content = file.read()
-
-        # Check if the import statement already exists
-        if import_string not in content:
-            # If it doesn't exist, add it to the end of the file
-            with open(init_file_path, 'a') as file:
-                file.write('\n' + import_string)
-            print(f"Added {import_string} to {init_file_path}")
-        else:
-            print(f"{import_string} already exists in {init_file_path}")
+        with self.file_lock: # parallel imports
+            with open(init_file_path, 'r') as file:
+                content = file.read()
+            if import_string not in content:
+                with open(init_file_path, 'a') as file:
+                    file.write('\n' + import_string)
 
     def remove_import_from_init(self, init_file_path, import_string):
-        """Removes a specific import string from the __init__.py file."""
-        if not os.path.exists(init_file_path):
-            return
-
-        with open(init_file_path, 'r') as file:
-            lines = file.readlines()
-
-        # Filter out the line that matches the import_string
-        # We strip whitespace to ensure a clean match
-        new_lines = [line for line in lines if line.strip() != import_string.strip()]
-
-        with open(init_file_path, 'w') as file:
-            file.writelines(new_lines)
-        
-        print(f"Removed {import_string} from {init_file_path}")
+        with self.file_lock: # parallel removals
+            if not os.path.exists(init_file_path): return
+            with open(init_file_path, 'r') as file:
+                lines = file.readlines()
+            new_lines = [line for line in lines if line.strip() != import_string.strip()]
+            with open(init_file_path, 'w') as file:
+                file.writelines(new_lines)
 
     def genML(self, model: str):
         metaomni_dir = self._get_metaomni_path()
         os.makedirs(metaomni_dir, exist_ok=True)
-        class_name_prompt = f"""Write a succinct pythonic class name for a model with name {model}, putting the name between the XML tags <name>Insert Class Name of Model Here</name>"""
-        class_name = self.extract_name(self.gen(class_name_prompt))
         
-        filename_prompt = f"""Write a succinct pythonic file name for a model with name {model}, putting the file name between the XML tags <name>Insert Class Name of File Here</name>"""
-        filename = self.extract_name(self.gen(filename_prompt))
+        # SPEED OPTIMIZATION: Combine Naming and Coding into 1 prompt
+        mega_prompt = f"""
+        Design a {model} classifier in the style of SciKit learn.
         
-        import_string = f"from metaomni.{filename.split('.py')[0]} import *"
-        prompt = f"""Write a {model} classifier in the style of SciKit learn, with a {class_name} class that implements the methods fit(self, X_train, y_train) and predict(self, X_test).
-
-        IMPORTANT: Put ALL your code in a single markdown code block. Format it exactly like this:
-
-        ```python
-        [your complete code here]
-        ```
-
-        Do not include any explanations, comments, or text outside the code block. Only return the code block with the complete implementation."""
-        implementation = self.gen(prompt)
+        1. Provide a succinct pythonic class name between <class_name></class_name> tags.
+        2. Provide a succinct pythonic filename (ending in .py) between <file_name></file_name> tags.
+        3. Provide the complete implementation in a single markdown python code block.
         
-        snippets = self.extract_code_snippets(implementation)
+        The class must implement fit(self, X_train, y_train) and predict(self, X_test).
+        Only return the tags and the code block.
+        """
+        response = self.gen(mega_prompt)
+        
+        # Robust Extraction
+        class_name = re.search(r'<class_name>(.*?)</class_name>', response, re.DOTALL).group(1).strip()
+        filename = re.search(r'<file_name>(.*?)</file_name>', response, re.DOTALL).group(1).strip()
+        snippets = self.extract_code_snippets(response)
+        
         filepath = self._get_metaomni_path(filename)
+        import_string = f"from metaomni.{filename.split('.py')[0]} import *"
         
         if self.save_first_snippet(snippets, filepath):
             init_file_path = self._get_metaomni_path('__init__.py')
             self.add_import_to_init(init_file_path, import_string)
+            
             if self.execute(filename, class_name, model, count=1):                
                 return (filename, class_name, model)
             else:
@@ -212,7 +229,7 @@ print("{class_name}", accuracy)
         return None
 
     def parallel_genML(self, prompt_list):
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             return list(tqdm(executor.map(self.genML, prompt_list), total=len(prompt_list)))
 
 # NOTE (V.S) : Not sure what to do with this
