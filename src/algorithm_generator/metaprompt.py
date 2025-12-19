@@ -188,3 +188,79 @@ Quadratic Discriminant Analysis
 Linear Discriminant Analysis""".split('\n')
 
 NUM_IDEAS = 3
+
+# Batch 1: Linear & Statistical
+# NUM_IDEAS = 4 
+# RESEARCH_PRINCIPLES = [
+#     "Simplicity vs. complexity",
+#     "Bias - Variance Decomposition",
+#     "Linearity and Additivity",
+#     "Closed-form solutions",
+#     "Statistical independence"
+# ]
+
+# MODELS = [
+#     "Logistic Regression",
+#     "Linear Discriminant Analysis",
+#     "Quadratic Discriminant Analysis",
+#     "Naive Bayes",
+#     "Perceptron Classifier",
+#     "Passive Aggressive Classifier",
+#     "Ridge Classifier",
+#     "Stochastic Gradient Descent Classifier",
+#     "Nearest Centroid",
+#     "Bernoulli Naive Bayes",
+#     "Multinomial Naive Bayes"
+# ]
+
+# # Batch 2: Non-Linear & Ensemble
+# NUM_IDEAS = 4
+# RESEARCH_PRINCIPLES = [
+#     "Abstraction - fine vs. coarse grain structure",
+#     "Randomness and Bagging",
+#     "Boosting and Residuals",
+#     "Non-parametric density estimation",
+#     "Feature subspace projection",
+#     "Dimensionality - Interactions between features"
+# ]
+
+# MODELS = [
+#     "Random Forests",
+#     "Gradient Boosting Machine",
+#     "K-Nearest Neighbors",
+#     "Decision Trees for Classification",
+#     "Bagged Decision Trees",
+#     "Extra Trees Classifier",
+#     "AdaBoost",
+#     "Kernel Support Vector Machine",
+#     "Histogram-based Gradient Boosting",
+#     "Radius Neighbors Classifier",
+#     "Multi-layer Perceptron (MLP)"
+# ]
+
+# # Batch 3: Abstract & Frontier
+# NUM_IDEAS = 4
+# RESEARCH_PRINCIPLES = [
+#     "Framed as Compression",
+#     "Framed as Compression",
+#     "Degree of Compression",
+#     "Information Geometry",
+#     "Bio-inspired Metaheuristics",
+#     "Discrete vs. Continuous structure mapping",
+#     "Kolmogorov Complexity as an Inductive Bias"
+# ]
+
+# MODELS = [
+#     "Kolmogorov Complexity Classifier",
+#     "Kolmogorov Complexity Classifier",
+#     "Minimum Description Length (MDL) Learner",
+#     "Fisher Information Metric Classifier",
+#     "Cellular Automata-based Ensemble",
+#     "Quantum-Inspired Probabilistic Learner",
+#     "Fractal Dimension Subspace Classifier",
+#     "Reservoir Computing Classifier",
+#     "Self-Organizing Map Classifier",
+#     "Evolutionary Strategy Ensemble",
+#     "Hyperdimensional Computing Classifier",
+#     "Topological Data Analysis (TDA) Classifier"
+# ]
