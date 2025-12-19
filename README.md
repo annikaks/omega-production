@@ -113,7 +113,7 @@ Open: `src/algorithm_generator/evaluate.py`
 By default, models are loaded from: `src/algorithm_generator/metaomni/` (if you saved models elsewhere, ensure the directory appears in `models_dir` in `main()`)
 
 ### Step 2: Adding Datasets
-The evaluation suite is classification-focused by default, since the default generation prompt produces classifiers.
+The evaluation suite is **classification-only** by default, since the default generation prompt produces classifiers.
 
 We default to classifcaiton datasets: Iris, Wine, Breast Cancer, Digits
 
@@ -135,17 +135,17 @@ This will
 *Note: Any extra output (e.g. epoch logs, training losses) is printed directly by model implementations and must be handled inside the model .py files. If you see lots of ERR in your table, the generated model isn't able to handle the dataset properly. Set `logging` to true to see the exceptions/errors being thrown.*
 
 #### Example output:
-| Model                        | Iris   | Wine   | Breast Cancer | Digits | Olivetti Faces | Aggregate |
-|-----------------------------|--------|--------|---------------|--------|----------------|-----------|
-| CompressionAwareLoss         | 1.0000 | 1.0000 | 0.9737        | 0.9750 | 0.9375         | 0.961     |
-| AdaptiveLocalPruner          | 0.9000 | 1.0000 | 0.9737        | 0.9694 | 0.8625         | 0.889     |
-| BVOptimizedBagger            | 1.0000 | 0.9444 | 0.9474        | 0.9333 | ERR            | 0.671     |
-| MultiResolutionPathwayFusion | 1.0000 | ERR    | ERR           | 0.9611 | 0.9625         | 0.597     |
-| MultiLevelAbstractionTree    | 1.0000 | 0.9444 | 0.9386        | 0.4722 | 0.0375         | 0.547     |
-| AdaptiveComplexityNet        | ERR    | ERR    | 0.9649        | 0.9750 | ERR            | 0.350     |
-| HybridNeuronModel            | 0.6333 | 0.6944 | 0.9912        | 0.1139 | 0.0375         | 0.200     |
-| SimilarityAttention          | ERR    | ERR    | ERR           | ERR    | ERR            | 0.000     |
-| AdaptiveComplexityBagger     | ERR    | ERR    | ERR           | ERR    | ERR            | 0.000     |
+| Model                        | Iris  | Wine  | Breast Cancer | Digits | Aggregate |
+|------------------------------|-------|-------|----------------|--------|-----------|
+| CompressionDrivenLearner     | 1.0000 | 1.0000 | 0.9825 | 0.9722 | **0.978** |
+| CompressionAwareLoss         | 1.0000 | 1.0000 | 0.9737 | 0.9778 | 0.958 |
+| AdaptiveComplexityNet        | ERR | 0.9722 | 0.9825 | 0.9694 | 0.704 |
+| DirectionalEnsembleTrees     | 1.0000 | 0.9722 | 0.8860 | 0.5972 | 0.617 |
+| MultiResolutionPathwayFusion | 1.0000 | ERR | ERR | 0.9611 | 0.495 |
+| HybridNeuronModel            | 0.6333 | 0.6944 | 0.9912 | 0.1139 | 0.250 |
+| SimilarityAttention          | ERR | ERR | ERR | ERR | 0.000 |
+| MultiLevelAbstractionNet     | ERR | ERR | ERR | ERR | 0.000 |
+
 
 
 
