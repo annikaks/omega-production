@@ -362,7 +362,7 @@ def main():
     logging = False
 
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    metaomni_dir = os.path.join(current_dir, "metaomni/batch3")
+    metaomni_dir = os.path.join(current_dir, "metaomni")
     models_dirs = [metaomni_dir]
 
     suite = BenchmarkSuite(
