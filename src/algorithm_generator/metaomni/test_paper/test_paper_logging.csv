@@ -1,0 +1,7 @@
+Model,Class,Status,Retries,Errors
+Use manifold learning to project data into intrinsic low-dimensional space before applying LDA to reduce noise from irrelevant dimensions,ManifoldLDA,FAILED,0,
+Replace global covariance with locally adaptive covariance matrices estimated from k-nearest neighbors in feature space,LocalCovarianceKNNClassifier,FAILED,0,
+Introduce sparse regularization on discriminant directions to automatically select relevant features while maintaining interpretability,SparseDiscriminantClassifier,FAILED,0,
+Use manifold learning to project data into intrinsic low-dimensional space before applying LDA to reduce noise from irrelevant dimensions,ManifoldLDA,SUCCESS,0,
+Replace global covariance with locally adaptive covariance matrices estimated from k-nearest neighbors in feature space,LocalCovarianceKNNClassifier,SUCCESS,0,
+Introduce sparse regularization on discriminant directions to automatically select relevant features while maintaining interpretability,SparseDiscriminantClassifier,SUCCESS,0,
