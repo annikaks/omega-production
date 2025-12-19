@@ -1,15 +1,14 @@
-from sklearn.datasets import load_iris, load_wine, load_breast_cancer, load_digits
+from sklearn.datasets import load_iris, load_wine, load_breast_cancer, load_digits, fetch_openml
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from data_loader import load_classification_datasets
 
 import numpy as np
 from sklearn.metrics import (
     accuracy_score,
-    precision_recall_fscore_support,
-    confusion_matrix,
-    roc_auc_score,
-    average_precision_score,
-    cohen_kappa_score,
 )
 
 from sklearn.base import BaseEstimator, clone
@@ -18,43 +17,23 @@ import importlib.util
 import inspect
 import os
 
-# (classification only)
+
 class BenchmarkSuite:
-    def __init__(self, dataset_names=None, test_size: float = 0.2, random_state: int = 42):
+    def __init__(self, dataset_names=None, test_size: float = 0.2, random_state: int = 42, logging: bool = False, debugging: bool = False):
         self.test_size = test_size
         self.random_state = random_state
         self.dataset_names = dataset_names or ["Iris", "Wine", "Breast Cancer", "Digits"]
-        self.datasets = self._load_datasets()
+        self.datasets = load_classification_datasets(
+            dataset_names=self.dataset_names,
+            test_size=self.test_size,
+            random_state=self.random_state,
+            logging=logging,
+        )
+        self.logging = logging
+        self.debugging = debugging
         self.results: Dict[str, Dict[str, Dict[str, float]]] = {}
 
-    def _load_datasets(self) -> Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
-        # classification-only datasets
-        datasets = {
-            "Iris": load_iris(return_X_y=True),
-            "Wine": load_wine(return_X_y=True),
-            "Breast Cancer": load_breast_cancer(return_X_y=True),
-            "Digits": load_digits(return_X_y=True),
-        }
-
-        split_datasets = {}
-        for name in self.dataset_names:
-            if name not in datasets:
-                raise ValueError(
-                    f"Dataset '{name}' not supported. Classification-only supported: {list(datasets.keys())}"
-                )
-
-            X, y = datasets[name]
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=self.test_size, random_state=self.random_state
-            )
-            scaler = StandardScaler()
-            X_train_scaled = scaler.fit_transform(X_train)
-            X_test_scaled = scaler.transform(X_test)
-            split_datasets[name] = (X_train_scaled, X_test_scaled, y_train, y_test)
-        
-        return split_datasets
-
-    def run_benchmark(self, models: List[BaseEstimator], logging:bool = False) -> Dict[str, Dict[str, float]]:
+    def run_benchmark(self, models: List[BaseEstimator]) -> Dict[str, Dict[str, float]]:
         for model in models:
             model_name = model.__class__.__name__
             self.results[model_name] = {}
@@ -68,27 +47,15 @@ class BenchmarkSuite:
                     self.results[model_name][dataset_name] = {"Accuracy": score}
                 except Exception as e:
                     msg = f"{model_name} failed on {dataset_name}: {type(e).__name__}: {e}"
-                    if logging:
+                    if self.logging and self.debugging:
                         print(msg)
                     self.results[model_name][dataset_name] = {"error": msg}
+
+                if self.logging: print(f"Evaluated {model_name} on {dataset_name}")
 
         return self.results
 
     def compute_aggregate_relative_score_strict(self):
-        """
-        !! If I randomly pick one of these datasets, how close is this model to the best-performing model on that dataset?
-        n_{m,d} = (s_{m,d} - min_d) / (max_d - min_d)  # s_{m,d} = models accuracy on dataset d
-        RelAgg_m = (1 / |D|) * Σ_d n_{m,d}
-        
-        Strict aggregate score:
-        - normalize model scores into [0,1] using min-max over successful models (/dataset)
-        - any ERR/missing scores = 0.0 for that dataset
-        - Aggregate is the mean normalized score across ALL datasets (equal weight)
-
-        Returns:
-        aggregate: dict[model_name] -> float
-        norm_by_dataset: dict[dataset_name] -> dict[model_name] -> float
-        """
         datasets = list(self.datasets.keys())
         models = list(self.results.keys())
 
@@ -147,29 +114,7 @@ class BenchmarkSuite:
             row += f"{aggregate.get(model_name, 0.0):.3f}".ljust(colw)
             print(row)
 
-
-
-    def _get_metric_label(self, dataset_name: str):
-        for model_results in self.results.values():
-            cell = model_results.get(dataset_name, {})
-            if "Accuracy" in cell:
-                return "Accuracy"
-            if "R2" in cell:
-                return "R²"
-        return "Metric"
-    
-    
-
-    def _get_metric_label(self, dataset_name: str):
-        for model_results in self.results.values():
-            cell = model_results.get(dataset_name, {})
-            if "Accuracy" in cell:
-                return "Accuracy"
-            if "R2" in cell:
-                return "R²"
-        return "Metric"
-    
-    def save_latex_table_multirow( self, filepath: str, caption: str = "Benchmark results", label: str = "tab:benchmark",):
+    def save_latex_table_multirow(self, filepath: str, caption: str = "Benchmark results", label: str = "tab:benchmark"):
         datasets = list(self.datasets.keys())
         models = list(self.results.keys())
 
@@ -187,11 +132,9 @@ class BenchmarkSuite:
             f.write(f"\\caption{{{caption}}}\n")
             f.write(f"\\label{{{label}}}\n")
 
-            # aggregate col
             f.write("\\begin{tabular}{l" + "c" * (len(datasets) + 1) + "}\n")
             f.write("\\toprule\n")
 
-            # row 1: group
             f.write(
                 "Model"
                 + f" & \\multicolumn{{{len(datasets)}}}{{c}}{{Classification}}"
@@ -200,14 +143,12 @@ class BenchmarkSuite:
             )
             f.write(f"\\cmidrule(lr){{2-{1 + len(datasets)}}}\n")
 
-            # row 2: dataset names
             header2 = " "
             for d in datasets:
                 header2 += f" & \\multicolumn{{1}}{{c}}{{{d}}}"
             header2 += " & "
             f.write(header2 + " \\\\\n")
 
-            # row 3: metric labels
             header3 = " "
             for _ in datasets:
                 header3 += " & Accuracy"
@@ -235,12 +176,7 @@ class BenchmarkSuite:
         print("!!!Make sure to include \\\\usepackage{booktabs} and \\\\usepackage{multirow}")
 
 
-
-def load_models_from_directory(models_dir: str, logging: bool=False):
-    """
-    Dynamically loads sklearn-style models from all .py files in a directory.
-    Returns: list of model instances
-    """
+def load_models_from_directory(models_dir: str, logging: bool = False):
     models = []
 
     for filename in sorted(os.listdir(models_dir)):
@@ -265,42 +201,52 @@ def load_models_from_directory(models_dir: str, logging: bool=False):
             if not hasattr(obj, "fit") or not hasattr(obj, "predict"):
                 continue
 
-            try: # try instantiating
+            try:
                 instance = obj()
                 models.append(instance)
-                if logging: print(f"Loaded model: {obj.__name__} from {filename}")
+                if logging:
+                    print(f"Loaded model: {obj.__name__} from {filename}")
             except Exception as e:
-                if logging: print(f"Skipped {obj.__name__} (could not instantiate): {e}")
+                if logging:
+                    print(f"Skipped {obj.__name__} (could not instantiate): {e}")
 
     return models
 
 
 def main():
-    logging = False
+    logging = True
     
     current_dir = os.path.dirname(os.path.abspath(__file__))
     metaomni_dir = os.path.join(current_dir, "metaomni")
     models_dir = [metaomni_dir]
 
-    suite = BenchmarkSuite(
-        dataset_names=["Iris", "Wine", "Breast Cancer", "Digits"],
+    # SUPPORTED_DATASETS = ["Iris", "Wine", "Breast Cancer", "Digits", "Adult", "Bank Marketing", "Credit-G", "Phoneme", "Spambase", "Ionosphere", "Sonar", "Vehicle", "Glass"]
+    suite = BenchmarkSuite(dataset_names=[
+        "Iris",
+        "Breast Cancer",
+        "Adult",
+        "Credit-G",
+        "Vehicle",
+        "Glass",
+        ],
+        logging=logging,
+        debugging=False,
     )
 
     models = []
     for dir in models_dir:
         print(f"loading {len(os.listdir(dir))} files from {dir}") 
         models.extend(load_models_from_directory(dir, logging))
-    
 
     if not models:
         print("No valid models found.")
         return
 
-    suite.run_benchmark(models, logging)
+    suite.run_benchmark(models[:5])
     suite.print_table()
 
     suite.save_latex_table_multirow(
-        filepath="src/algorithm_generator/results/benchmark_multirow_25_12_18.tex",
+        filepath=f"{current_dir}/results/benchmark_multirow_25_12_18.tex",
         caption="MetaOmni-generated models evaluated on classification datasets.",
         label="tab:metaomni-classification-benchmark",
     )

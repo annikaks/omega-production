@@ -115,7 +115,24 @@ By default, models are loaded from: `src/algorithm_generator/metaomni/` (if you 
 ### Step 2: Adding Datasets
 The evaluation suite is **classification-only** by default, since the default generation prompt produces classifiers.
 
-We default to classifcaiton datasets: Iris, Wine, Breast Cancer, Digits
+We default to classifcaiton datasets: 
+| Dataset | OpenML data_id | Task type | What the model predicts (target y) |
+|--------|----------------|-----------|-----------------------------------|
+| Iris | 61 | Multiclass classification | Iris species (Setosa / Versicolor / Virginica) |
+| Wine | 187 | Multiclass classification | Wine cultivar / class (3 classes) |
+| Breast Cancer | 15 | Binary classification | Malignant vs. benign tumor |
+| Digits | 554 | Multiclass classification | Digit label (0–9) from handwritten image features |
+| Adult* | 1590 | Binary classification | Income >50K vs. ≤50K |
+| Bank Marketing* | 1461 | Binary classification | Whether client subscribes to a term deposit (yes/no) |
+| Credit-G* | 31 | Binary classification | Credit risk (good vs. bad) |
+| Phoneme* | 1489 | Binary classification | Phoneme class from speech features |
+| Spambase | 44 | Binary classification | Spam vs. non-spam email |
+| Ionosphere | 59 | Binary classification | Good vs. bad radar return |
+| Sonar | 40 | Binary classification | Mine vs. rock |
+| Vehicle | 54 | Multiclass classification | Vehicle type (4 classes) |
+| Glass | 41 | Multiclass classification | Glass type (manufacturing category) |
+
+(**are all typically non-saturating*)
 
 To add datasets:
 - Add their names to `dataset_names`
