@@ -359,7 +359,8 @@ def load_models_from_directory(models_dir: str, logging: bool = False):
 
 
 def main():
-    logging = False
+    t_start = time.perf_counter()
+    logging = True
 
     current_dir = os.path.dirname(os.path.abspath(__file__))
     metaomni_dir = os.path.join(current_dir, "metaomni")
@@ -381,8 +382,8 @@ def main():
     models: List[BaseEstimator] = []
     for d in models_dirs:
         py_count = len([f for f in os.listdir(d) if f.endswith(".py")])
-        print(f"loading ~{py_count} .py files from {d}")
         models.extend(load_models_from_directory(d, logging=logging))
+        print(f"loading ~{py_count} .py files from {d}")
 
     if not models:
         print("No valid models found.")
@@ -407,6 +408,9 @@ def main():
         caption="MetaOmni-generated models evaluated on classification datasets.",
         label="tab:metaomni-classification-benchmark",
     )
+
+    t_end = time.perf_counter()
+    print(f"\nTotal runtime: {t_end - t_start:.2f} seconds")
 
 
 if __name__ == "__main__":
