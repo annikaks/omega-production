@@ -106,7 +106,7 @@ class BenchmarkSuite:
     ):
         self.test_size = test_size
         self.random_state = random_state
-        self.dataset_names = dataset_names or ["Iris", "Wine", "Breast Cancer", "Digits"]
+        self.dataset_names = dataset_names or ["Iris", "Wine", "Breast Cancer", "Digits" , "Balance Scale", "Blood Transfusion", "Haberman", "Seeds", "Teaching Assistant", "Zoo", "Planning Relax", "Ionosphere", "Sonar", "Glass", "Vehicle", "Liver Disorders", "Heart Statlog", "Pima Indians Diabetes", "Australian", "Monks-1"]
 
         self.datasets = load_classification_datasets(
             dataset_names=self.dataset_names,
@@ -114,6 +114,7 @@ class BenchmarkSuite:
             random_state=self.random_state,
             logging=logging,
         )
+        print(f"Loaded {len(self.datasets)} datasets for benchmarking.")
 
         self.logging = logging
         self.debugging = debugging
@@ -195,7 +196,7 @@ class BenchmarkSuite:
 
         return aggregate, norm_by_dataset
 
-    def print_table(self):
+    def print_table(self, filepath=None):
         datasets = list(self.datasets.keys())
         models = list(self.results.keys())
 
@@ -209,8 +210,10 @@ class BenchmarkSuite:
             + "".join(d.ljust(colw) for d in datasets)
             + "Aggregate".ljust(colw)
         )
-        print(header)
-        print("-" * len(header))
+
+        lines = []
+        lines.append(header)
+        lines.append("-" * len(header))
 
         models_sorted = sorted(models, key=lambda m: aggregate.get(m, 0.0), reverse=True)
 
@@ -223,7 +226,15 @@ class BenchmarkSuite:
                 else:
                     row += "ERR".ljust(colw)
             row += f"{aggregate.get(model_name, 0.0):.3f}".ljust(colw)
-            print(row)
+            lines.append(row)
+
+        full_table_text = "\n".join(lines)
+        print(full_table_text)
+
+        if filepath:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(full_table_text)
+            print(f"\nTable successfully saved to: {filepath}")
 
     def summarize_runtime(self):
         summary: Dict[str, Dict[str, float]] = {}
@@ -363,17 +374,7 @@ def main():
     t_start = time.perf_counter()
     logging = True
 
-    models_dirs = EVALUATION_DIRECTORY_PATH
-
     suite = BenchmarkSuite(
-        dataset_names=[
-            "Iris",
-            "Breast Cancer",
-            "Credit-G",
-            "Phoneme",
-            "Vehicle",
-            "Glass",
-        ],
         logging=logging,
         debugging=False,
     )
@@ -391,19 +392,19 @@ def main():
     logs_dir = os.path.join(GENERATION_DIRECTORY_PATH, "evaluation_logs")
     os.makedirs(logs_dir, exist_ok=True)
 
-    suite.save_runtime_stats_csv(os.path.join(logs_dir, "runtime_task_stats.csv"))
+    suite.save_runtime_stats_csv(os.path.join(logs_dir, "runtime_log.csv"))
 
     runtime_summary = suite.summarize_runtime()
     pd.DataFrame.from_dict(runtime_summary, orient="index").to_csv(
         os.path.join(logs_dir, "runtime_summary.csv")
     )
 
-    suite.print_table()
+    suite.print_table(filepath=os.path.join(logs_dir, "results_table.txt"))
 
     suite.save_latex_table_multirow(
-        filepath=os.path.join(logs_dir, "benchmark_multirow.tex"),
+        filepath=os.path.join(logs_dir, "results_table.tex"),
         caption="MetaOmni-generated models evaluated on classification datasets.",
-        label="tab:metaomni-classification-benchmark",
+        label="tab:classification-table",
     )
 
     t_end = time.perf_counter()

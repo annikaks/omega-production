@@ -1,0 +1,4 @@
+,mean_total_s,max_total_s,timeouts
+RandomForestClassifier,0.23726515634916723,0.8726688751485199,0
+HistGradientBoostingClassifier,0.48277951469644903,3.1504351671319455,0
+LogisticRegression,0.009986931318417191,0.08829008415341377,0
