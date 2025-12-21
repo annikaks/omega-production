@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 
 import anthropic
 from tqdm import tqdm
-
+from metaprompt import GENERATION_DIRECTORY_PATH, IMPORT_STRUCTURE_PREFIX
 import metaomni
 import threading
 import time
@@ -43,7 +43,9 @@ class AlgoGen:
         current_dir = os.path.dirname(__file__)
         metaomni_dir = os.path.join(current_dir, 'metaomni')
         if filename:
+            print(f"get_metaomni_path {os.path.join(metaomni_dir, filename)}")
             return os.path.join(metaomni_dir, filename)
+        print(f"get_metaomni_path {metaomni_dir}")
         return metaomni_dir
 
     def gen(self, prompt: str) -> str:
@@ -111,7 +113,7 @@ class AlgoGen:
     def execute(self, filename, class_name, model, count=1, history=None):
         if history is None:
             history = []
-        filepath = self._get_metaomni_path(filename)
+        filepath = os.path.join(GENERATION_DIRECTORY_PATH, filename)
         if count > 2:
             self.log_experiment(model, class_name, "FAILED", history)
             try:
@@ -124,7 +126,7 @@ class AlgoGen:
         module_name = filename.split(".py")[0]
 
         EXECUTION_STRINGS = f"""
-m = importlib.import_module("metaomni.{module_name}")
+m = importlib.import_module("{IMPORT_STRUCTURE_PREFIX}{module_name}")
 importlib.reload(m)
 print("Module:", m)
 print("Has class:", hasattr(m, "{class_name}"))
@@ -157,7 +159,7 @@ print("{class_name}", accuracy)
             error_type = type(e).__name__
             print("Hit error: ", error_message)
             history.append({"attempt": count, "error": error_type, "message": error_message})
-            filepath = self._get_metaomni_path(filename)
+            filepath = os.path.join(GENERATION_DIRECTORY_PATH, filename)
             prompt = f"""
             Existing code:
             {open(filepath, 'r').read()}
@@ -194,7 +196,7 @@ print("{class_name}", accuracy)
                 file.writelines(new_lines)
 
     def genML(self, model: str):
-        metaomni_dir = self._get_metaomni_path()
+        metaomni_dir = GENERATION_DIRECTORY_PATH
         os.makedirs(metaomni_dir, exist_ok=True)
         
         # SPEED OPTIMIZATION: Combine Naming and Coding into 1 prompt
@@ -215,11 +217,14 @@ print("{class_name}", accuracy)
         filename = re.search(r'<file_name>(.*?)</file_name>', response, re.DOTALL).group(1).strip()
         snippets = self.extract_code_snippets(response)
         
-        filepath = self._get_metaomni_path(filename)
-        import_string = f"from metaomni.{filename.split('.py')[0]} import *"
+        filepath = os.path.join(GENERATION_DIRECTORY_PATH, filename)
+        if(IMPORT_STRUCTURE_PREFIX == ""): 
+            Warning("IMPORT_STRUCTURE_PREFIX is empty, imports may fail.")
+        import_string = f"from {IMPORT_STRUCTURE_PREFIX}{filename.split('.py')[0]} import *"
         
         if self.save_first_snippet(snippets, filepath):
-            init_file_path = self._get_metaomni_path('__init__.py')
+            init_file_path = os.path.join(GENERATION_DIRECTORY_PATH, '__init__.py')
+
             self.add_import_to_init(init_file_path, import_string)
             
             if self.execute(filename, class_name, model, count=1):                

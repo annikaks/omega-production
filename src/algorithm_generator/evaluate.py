@@ -23,6 +23,7 @@ from sklearn.exceptions import ConvergenceWarning
 from scipy.sparse import SparseEfficiencyWarning
 
 from data_loader import load_classification_datasets
+from metaprompt import GENERATION_DIRECTORY_PATH, EVALUATION_DIRECTORY_PATH
 
 
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
@@ -362,9 +363,7 @@ def main():
     t_start = time.perf_counter()
     logging = True
 
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    metaomni_dir = os.path.join(current_dir, "metaomni")
-    models_dirs = [metaomni_dir]
+    models_dirs = EVALUATION_DIRECTORY_PATH
 
     suite = BenchmarkSuite(
         dataset_names=[
@@ -379,11 +378,9 @@ def main():
         debugging=False,
     )
 
-    models: List[BaseEstimator] = []
-    for d in models_dirs:
-        py_count = len([f for f in os.listdir(d) if f.endswith(".py")])
-        models.extend(load_models_from_directory(d, logging=logging))
-        print(f"loading ~{py_count} .py files from {d}")
+    models = load_models_from_directory(EVALUATION_DIRECTORY_PATH, logging=logging)
+    num_models_loaded = len([f for f in os.listdir(EVALUATION_DIRECTORY_PATH) if f.endswith(".py")]) - 1 # -1 for __init__.py
+    print(f"loaded {num_models_loaded} models")
 
     if not models:
         print("No valid models found.")
@@ -391,7 +388,7 @@ def main():
 
     suite.run_benchmark(models, n_jobs=4)
 
-    logs_dir = os.path.join(metaomni_dir, "evaluation_logs")
+    logs_dir = os.path.join(GENERATION_DIRECTORY_PATH, "evaluation_logs")
     os.makedirs(logs_dir, exist_ok=True)
 
     suite.save_runtime_stats_csv(os.path.join(logs_dir, "runtime_task_stats.csv"))

@@ -3,15 +3,21 @@ import time
 
 import anthropic
 
-from metaprompt import RESEARCH_PRINCIPLES, MODELS, NUM_IDEAS
+from metaprompt import RESEARCH_PRINCIPLES, MODELS, NUM_IDEAS, LOG_FILE, GENERATION_DIRECTORY_PATH, IMPORT_STRUCTURE_PREFIX
 from generate import AlgoGen
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
-algo_gen = AlgoGen(anthropic.Anthropic(api_key=ANTHROPIC_API_KEY), log_file="batch3_logging.csv")
+algo_gen = AlgoGen(anthropic.Anthropic(api_key=ANTHROPIC_API_KEY), log_file=LOG_FILE)
 # benchmark_suite = BenchmarkSuite()
 total_models = 0
 for m in MODELS[1:]:
+    init_file_path = os.path.join(GENERATION_DIRECTORY_PATH, '__init__.py')
+    if not os.path.exists(init_file_path):
+        Warning("__init__.py doesnt exist, modules might not be imported.")
+    if(IMPORT_STRUCTURE_PREFIX == ""): 
+            Warning("IMPORT_STRUCTURE_PREFIX is empty, imports may fail.")
+
     print(f"Generating ideas for model {m}...")
     ideas_raw = algo_gen.gen(f"""Principles of Machine Learning: {RESEARCH_PRINCIPLES}
     Inspired by these principles, come up with 10 very creative ideas for how to vary the {m} classifier for better performance.
@@ -42,7 +48,8 @@ for m in MODELS[1:]:
 
     print(f"Generating implementations for {len(ideas_list)} ideas (limited to {NUM_IDEAS})...")
     generated_files_result = algo_gen.parallel_genML(ideas_list)
-    print(f"Successfully generated {len(generated_files_result)} models")
-    total_models += len(generated_files_result)
+    num_successful_models = sum(x is not None for x in generated_files_result)
+    if num_successful_models > 0: print(f"Successfully generated {num_successful_models} models")
+    total_models += num_successful_models
     print(f"Results: {generated_files_result}")
 print(f"Total models generated: {total_models}")

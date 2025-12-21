@@ -187,7 +187,12 @@ Gradient Boosting Machine
 Quadratic Discriminant Analysis
 Linear Discriminant Analysis""".split('\n')
 
-NUM_IDEAS = 3
+## TODO: Saving/Generation Paths ##
+LOG_FILE = "/Users/annikaks/Desktop/omega/src/algorithm_generator/metaomni/metaomni_log.csv"
+GENERATION_DIRECTORY_PATH = "/Users/annikaks/Desktop/omega/src/algorithm_generator/metaomni"
+IMPORT_STRUCTURE_PREFIX = "metaomni."
+# ie for "from metaomni.{filename.split('.py')[0]} import *" > IMPORT_STRUCTURE_PREFIX = "metaomni."
+EVALUATION_DIRECTORY_PATH = GENERATION_DIRECTORY_PATH
 
 # Batch 1: Linear & Statistical
 # NUM_IDEAS = 4 
