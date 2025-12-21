@@ -38,6 +38,7 @@ def get_openml_classification_ids() -> Dict[str, Tuple[int, Optional[int]]]:
         "Heart Statlog": (53, None),          # 270
         "Pima Indians Diabetes": (37, None),  # 768
         "Australian": (40945, None),          # 690
+        "Monks-1": (333, None),               # 556
     }
 
 
