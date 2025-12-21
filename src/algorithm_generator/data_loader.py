@@ -23,15 +23,21 @@ from sklearn.impute import SimpleImputer
 
 def get_openml_classification_ids() -> Dict[str, Tuple[int, Optional[int]]]:
     return {
-        "Adult": (1590, 50000),        # large, cap rows
-        "Bank Marketing": (1461, None),
-        "Credit-G": (31, None),
-        "Phoneme": (1489, None),
-        "Spambase": (44, None),
-        "Ionosphere": (59, None),
-        "Sonar": (40, None),
-        "Vehicle": (54, None),
-        "Glass": (41, None),
+        "Balance Scale": (1463, None),        # 625
+        "Blood Transfusion": (1464, None),    # 748
+        "Haberman": (43, None),               # 306
+        "Seeds": (1499, None),                # 210
+        "Teaching Assistant": (48, None),     # 151
+        "Zoo": (62, None),                    # 101
+        "Planning Relax": (1490, None),       # 182
+        "Ionosphere": (59, None),             # 351
+        "Sonar": (40, None),                  # 208
+        "Glass": (41, None),                  # 214
+        "Vehicle": (54, None),                # 846
+        "Liver Disorders": (1459, None),      # 345
+        "Heart Statlog": (53, None),          # 270
+        "Pima Indians Diabetes": (37, None),  # 768
+        "Australian": (40945, None),          # 690
     }
 
 
