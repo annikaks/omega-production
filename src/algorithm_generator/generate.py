@@ -207,6 +207,13 @@ print("{class_name}", accuracy)
         2. Provide a succinct pythonic filename (ending in .py) between <file_name></file_name> tags.
         3. Provide the complete implementation in a single markdown python code block.
         
+        The class must inherit from sklearn.base.BaseEstimator. 
+        Example:
+        from sklearn.base import BaseEstimator
+        class <class_name>(BaseEstimator):
+            def __init__(self, ...):
+                # All arguments must be saved as attributes
+
         The class must implement fit(self, X_train, y_train) and predict(self, X_test).
         Only return the tags and the code block.
         """
