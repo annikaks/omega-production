@@ -1,29 +1,4 @@
 
-from metaomni._initial_metaomni_models.SimilarityAttention import *
-from metaomni._initial_metaomni_models.multilevel_abstraction_net import *
-from metaomni._initial_metaomni_models.hybrid_discrete_continuous_nodes import *
-from metaomni._initial_metaomni_models.dim_aware_connections import *
-from metaomni._initial_metaomni_models.directional_feature_extractor import *
-from metaomni._initial_metaomni_models.adaptive_complexity_scaler import *
-from metaomni._initial_metaomni_models.EntropyGuidedStructureNet import *
-from metaomni._initial_metaomni_models.compression_driven_learner import *
-from metaomni._initial_metaomni_models.fractal_net_arch import *
-from metaomni._initial_metaomni_models.bv_balance_layers import *
-from metaomni._initial_metaomni_models.daf_model import *
-from metaomni._initial_metaomni_models.similarity_weighted_ensemble import *
-from metaomni._initial_metaomni_models.directional_ensemble_trees import *
-from metaomni._initial_metaomni_models.multi_level_abstraction_trees import *
-from metaomni._initial_metaomni_models.hdcf_model import *
-from metaomni._initial_metaomni_models.adaptive_complexity_bagging import *
-from metaomni._initial_metaomni_models.cgb_model import *
-from metaomni._initial_metaomni_models.entropy_guided_bagging import *
-from metaomni._initial_metaomni_models.bvob_model import *
-from metaomni._initial_metaomni_models.gab_model import *
-from metaomni._initial_metaomni_models.hinge_svm import *
-
-
-
-
 from metaomni.test_paper.adaptive_regional_pruning import *
 from metaomni.test_paper.multi_resolution_pathway_fusion import *
 from metaomni.test_paper.compression_aware_loss import *
