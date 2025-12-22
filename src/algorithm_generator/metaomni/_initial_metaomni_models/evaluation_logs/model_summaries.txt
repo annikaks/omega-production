@@ -1,0 +1,41 @@
+SimilarityWeightedEnsemble : Weights base estimator predictions by cosine similarity between test samples and training samples, aggregating votes for each class based on similarity to training instances of that class. The ensemble combines multiple classifiers by giving higher influence to predictions when test points are similar to training examples that support those predictions.
+
+EntropyGuidedDynamicNet : Samples training data with probability proportional to local neighborhood entropy and adjusts tree depth based on average sample entropy to focus learning on uncertain regions. Higher entropy regions receive more sampling attention and deeper trees to capture complex decision boundaries.
+
+DirectionalFeatureExtractor : Applies Gabor filters at multiple orientations to extract directional edge features from images, then selects high-variance features for classification. The model captures orientation-specific patterns through convolution with rotated Gabor kernels that respond to edges at different angles.
+
+MultiLevelAbstractionTree : Builds multiple decision trees at different feature abstraction levels, progressively reducing feature sets based on importance from previous levels. Each level creates a coarser representation by selecting top features, enabling hierarchical decision-making from fine to coarse granularity.
+
+CompressionGuidedBagger : Weights bagging ensemble members based on their combined log-loss and prediction entropy, giving higher weight to models with lower loss and uncertainty. The compression-guided weighting balances prediction accuracy with model confidence to improve ensemble aggregation.
+
+EntropyGuidedBagger : Selects features for each bootstrap sample with probability proportional to their entropy relative to sample label entropy, focusing on informative features. Feature selection is entropy-weighted to prioritize features with high information content about class distributions.
+
+BVOptimizedBagger : Optimizes each bagging ensemble member's hyperparameters via cross-validation on bootstrap samples to minimize bias-variance tradeoff. Each estimator undergoes individual tuning to find optimal complexity for its specific data subset.
+
+BiasVarianceBalancingNet : Custom neural network layers that blend L2 regularization (bias term) with gradient updates (variance term) using a lambda parameter during backpropagation. The layer explicitly balances model complexity and fitting capacity by interpolating between regularization and gradient descent.
+
+AdaptiveComplexityBagger : Standard bootstrap aggregating with adaptive sampling of instances and features, though the implementation lacks the complexity adaptation mechanism suggested by the name. Creates ensemble diversity through random subsampling of both data points and feature dimensions.
+
+DimAwareConnector : Projects input features into pairwise interaction space, then uses random projections with RBF kernel to create a nonlinear mapping learned via pseudo-inverse. The model captures feature interactions through explicit polynomial expansion combined with random feature transformation.
+
+HingeSVM : Implements support vector machine using hinge loss optimization via L-BFGS-B, minimizing margin violations plus L2 regularization of weights. The hinge loss penalizes points within or on wrong side of the margin while the regularization term controls model complexity.
+
+HybridDiscreteContForest : Standard random forest implementation using bootstrap aggregation and majority voting across decision trees. Despite the name, it's a conventional ensemble without explicit hybrid discrete-continuous mechanisms.
+
+SimilarityAttention : Applies learned attention weights to cosine similarity between test and training samples, then predicts based on attended similarity-weighted voting. Multi-head attention modulates similarity scores to focus on relevant training examples for each prediction.
+
+GranularityAdaptiveBagger : Samples data and features at multiple granularity levels (coarse to fine) across ensemble members, with each estimator trained on different resolution subsets. Granularity controls the fraction of samples and features used, enabling multi-scale learning.
+
+DimensionalityAwareForest : Trains decision trees on random feature subspaces of size sqrt(n_features), implementing the random subspace method for ensemble diversity. Each tree sees a different random projection of the feature space to reduce correlation between ensemble members.
+
+DirectionalEnsembleTrees : Projects features onto random unit direction vectors before training decision trees, creating one-dimensional splits along random orientations. Each tree learns from a different random linear projection of the input space.
+
+HybridNeuronModel : Neurons alternate between continuous (sigmoid) and discrete (threshold) activation modes during training to combine smooth and hard decision boundaries. Mode switching occurs periodically to leverage both differentiable learning and discrete decision-making.
+
+MultiLevelAbstractionNet : Trains multiple classifier types on progressively enriched feature representations (raw, statistics, percentiles) and averages their predictions. Each abstraction level adds aggregate features to capture patterns at different scales of summarization.
+
+AdaptiveComplexityNet : Dynamically adds neural network layers when validation accuracy plateaus below threshold, growing model capacity to match problem complexity. The architecture expands during training to increase expressiveness when simpler models underfit.
+
+FractalNetArch : Recursively constructs neural network units where each unit contains two sub-units at lower depth, creating a self-similar fractal structure. Forward passes average outputs from parallel fractal branches while backward passes distribute gradients through the recursive hierarchy.
+
+CompressionDrivenLearner : Jointly trains an autoencoder for dimensionality reduction and a classifier on the compressed representations, using reconstruction loss to guide feature learning. The compressed encoding captures essential data structure while the classifier learns from this information-preserving bottleneck.
