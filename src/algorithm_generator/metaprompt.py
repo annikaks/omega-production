@@ -188,10 +188,14 @@ Quadratic Discriminant Analysis
 Linear Discriminant Analysis""".split('\n')
 
 # TODO: Saving/Generation Paths ##
-LOG_FILE = "/Users/annikaks/Desktop/omega/src/algorithm_generator/metaomni/tst.csv"
-GENERATION_DIRECTORY_PATH = "/Users/annikaks/Desktop/omega/src/algorithm_generator/metaomni"
+from pathlib import Path
+ALGO_GEN = Path(__file__).resolve().parent
+METAOMNI = ALGO_GEN / "metaomni"
+
+GENERATION_DIRECTORY_PATH = METAOMNI / "api_calls"
+LOG_FILE = GENERATION_DIRECTORY_PATH / "log.csv"
 SUMMARIZE_IMMEDIATELY = False
-IMPORT_STRUCTURE_PREFIX = "metaomni."
+IMPORT_STRUCTURE_PREFIX = "metaomni.api_calls."
 # ie for "from metaomni.{filename.split('.py')[0]} import *" > IMPORT_STRUCTURE_PREFIX = "metaomni."
 EVALUATION_DIRECTORY_PATH = GENERATION_DIRECTORY_PATH
 DESCRIPTION_DIRECTORY_PATH = ""
