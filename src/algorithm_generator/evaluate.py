@@ -23,7 +23,7 @@ from sklearn.exceptions import ConvergenceWarning
 from scipy.sparse import SparseEfficiencyWarning
 
 from data_loader import load_classification_datasets
-from metaprompt import GENERATION_DIRECTORY_PATH, EVALUATION_DIRECTORY_PATH
+from metaprompt import EVALUATION_DIRECTORY_PATH
 
 
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
@@ -165,36 +165,6 @@ class BenchmarkSuite:
             print(f"Benchmark done: {total - failed}/{total} succeeded, {failed} failed")
 
         return self.results
-
-    def compute_aggregate_relative_score_strict(self):
-        datasets = list(self.datasets.keys())
-        models = list(self.results.keys())
-
-        raw_by_dataset: Dict[str, Dict[str, float]] = {d: {} for d in datasets}
-        for d in datasets:
-            for m in models:
-                cell = self.results.get(m, {}).get(d, {})
-                if "Accuracy" in cell:
-                    raw_by_dataset[d][m] = float(cell["Accuracy"])
-
-        norm_by_dataset: Dict[str, Dict[str, float]] = {d: {} for d in datasets}
-        for d in datasets:
-            vals = list(raw_by_dataset[d].values())
-            if not vals:
-                continue
-            mn, mx = min(vals), max(vals)
-            denom = mx - mn
-            for m, s in raw_by_dataset[d].items():
-                norm_by_dataset[d][m] = 1.0 if denom == 0 else (s - mn) / denom
-
-        aggregate: Dict[str, float] = {}
-        for m in models:
-            total = 0.0
-            for d in datasets:
-                total += norm_by_dataset[d].get(m, 0.0)
-            aggregate[m] = total / len(datasets) if datasets else 0.0
-
-        return aggregate, norm_by_dataset
 
     def print_table(self, filepath=None):
         datasets = list(self.datasets.keys())
@@ -389,7 +359,7 @@ def main():
 
     suite.run_benchmark(models, n_jobs=4)
 
-    logs_dir = os.path.join(GENERATION_DIRECTORY_PATH, "evaluation_logs")
+    logs_dir = os.path.join(EVALUATION_DIRECTORY_PATH, "evaluation_logs")
     os.makedirs(logs_dir, exist_ok=True)
 
     suite.save_runtime_stats_csv(os.path.join(logs_dir, "runtime_log.csv"))
