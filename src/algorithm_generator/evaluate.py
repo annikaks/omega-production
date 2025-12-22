@@ -59,7 +59,10 @@ def eval_one_benchmark_task(
     pred_s: Optional[float] = None
 
     try:
-        fresh_model = clone(task.model)
+        try:
+            fresh_model = clone(task.model)
+        except Exception:
+            fresh_model = task.model.__class__()
 
         X_train = np.asarray(task.X_train)
         X_test = np.asarray(task.X_test)
@@ -166,6 +169,36 @@ class BenchmarkSuite:
 
         return self.results
 
+    def compute_aggregate_relative_score_strict(self):
+        datasets = list(self.datasets.keys())
+        models = list(self.results.keys())
+
+        raw_by_dataset = {d: {} for d in datasets}
+        for d in datasets:
+            for m in models:
+                cell = self.results.get(m, {}).get(d, {})
+                if "Accuracy" in cell:
+                    raw_by_dataset[d][m] = float(cell["Accuracy"])
+
+        norm_by_dataset = {d: {} for d in datasets}
+        for d in datasets:
+            vals = list(raw_by_dataset[d].values())
+            if not vals:
+                continue
+            mn, mx = min(vals), max(vals)
+            denom = mx - mn
+            for m, s in raw_by_dataset[d].items():
+                norm_by_dataset[d][m] = 1.0 if denom == 0 else (s - mn) / denom
+
+        aggregate = {}
+        for m in models:
+            total = 0.0
+            for d in datasets:
+                total += norm_by_dataset[d].get(m, 0.0)
+            aggregate[m] = total / len(datasets) if datasets else 0.0
+
+        return aggregate, norm_by_dataset
+    
     def print_table(self, filepath=None):
         datasets = list(self.datasets.keys())
         models = list(self.results.keys())
