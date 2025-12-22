@@ -2,13 +2,15 @@ import os
 import time
 
 import anthropic
-
-from metaprompt import RESEARCH_PRINCIPLES, MODELS, NUM_IDEAS, LOG_FILE, GENERATION_DIRECTORY_PATH, IMPORT_STRUCTURE_PREFIX
+from metaprompt import RESEARCH_PRINCIPLES, MODELS, NUM_IDEAS, LOG_FILE, GENERATION_DIRECTORY_PATH, IMPORT_STRUCTURE_PREFIX, SUMMARIZE_IMMEDIATELY
 from generate import AlgoGen
+from describe import ModelAnalyzer
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-
-algo_gen = AlgoGen(anthropic.Anthropic(api_key=ANTHROPIC_API_KEY), log_file=LOG_FILE)
+anthopic_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+algo_gen = AlgoGen(anthropic_client=anthopic_client, log_file=LOG_FILE)
+analyzer = ModelAnalyzer(anthropic_client=anthopic_client)
+summaries = os.path.join(GENERATION_DIRECTORY_PATH, "model_summaries.txt")
 # benchmark_suite = BenchmarkSuite()
 total_models = 0
 for m in MODELS[1:]:
@@ -49,7 +51,18 @@ for m in MODELS[1:]:
     print(f"Generating implementations for {len(ideas_list)} ideas (limited to {NUM_IDEAS})...")
     generated_files_result = algo_gen.parallel_genML(ideas_list)
     num_successful_models = sum(x is not None for x in generated_files_result)
-    if num_successful_models > 0: print(f"Successfully generated {num_successful_models} models")
+    if num_successful_models > 0: 
+        print(f"Successfully generated {num_successful_models} models")
+        if SUMMARIZE_IMMEDIATELY:
+            for result in generated_files_result:
+                if result is None:
+                    continue
+                filename, classname, idea = result
+                if filename:
+                    description = analyzer.describe_single(GENERATION_DIRECTORY_PATH, filename)
+                    with open(summaries, "a", encoding="utf-8") as f:
+                        f.write(description + "\n")
+
     total_models += num_successful_models
     print(f"Results: {generated_files_result}")
 print(f"Total models generated: {total_models}")
