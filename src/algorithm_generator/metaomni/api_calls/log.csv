@@ -1,0 +1,2 @@
+Model,Class,Status,Retries,Errors
+create a simple knn classifier,KNNClassifier,SUCCESS,0,
