@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infinity | OMEGA Model Lab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Crimson Pro', serif; background-color: #F2EEE3; }
+        .gold-border { border-color: #d4af37; }
+        .gold-bg { background-color: #D4AF37; }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <nav class="bg-white border-b border-gray-100 w-full fixed top-0 z-50">
+        <div class="max-w-7xl mx-auto px-10 py-8 flex justify-between items-center">
+            <div class="text-3xl tracking-[0.3em] font-light text-[#b8962e] font-sans">
+                INFINITY
+            </div>
+            
+            <div class="space-x-12 text-[14px] uppercase tracking-[0.25em] font-bold text-[#757575]">
+                <a href="#" class="hover:text-black transition-colors">Model Lab</a>
+                <a href="/docs" class="hover:text-black transition-colors">API Docs</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="h-32"></div>
+
+    <main class="max-w-4xl mx-auto pt-20 px-6">
+        <div class="text-center mb-16">
+            <h1 class="text-6xl mb-4 font-light">Make your own ML model.</h1>
+            <p class="text-gray-400 italic text-xl">Describe your architecture and let OMEGA synthesize the pathways.</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-2xl p-8 border border-gray-100">
+            <textarea id="prompt" rows="5" 
+                class="w-full text-2xl font-light border-none focus:ring-0 placeholder-gray-200 resize-none"
+                placeholder="e.g., A hybrid ensemble that prioritizes low-latency for tabular fraud detection..."></textarea>
+            
+            <div class="mt-8 pt-6 border-t border-gray-50 flex justify-between items-center">
+                <div class="flex gap-4">
+                    <span class="px-4 py-2 bg-gray-50 rounded-full text-xs text-gray-400 border border-gray-100">V1.0.4-Stable</span>
+                </div>
+                <button onclick="generateModel()" id="btn" class="gold-bg text-white px-10 py-3 rounded-full hover:opacity-90 transition-all shadow-lg font-semibold tracking-wide">
+                    Create Model
+                </button>
+            </div>
+        </div>
+
+        <div id="output" class="mt-12 hidden">
+            <div class="bg-black text-green-400 p-6 rounded-lg font-mono text-sm overflow-x-auto shadow-inner">
+                <p id="status" class="mb-4 text-white animate-pulse font-sans">Synthesizing...</p>
+                <pre id="codeBlock"></pre>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        async function generateModel() {
+            const prompt = document.getElementById('prompt').value;
+            const btn = document.getElementById('btn');
+            const output = document.getElementById('output');
+            const status = document.getElementById('status');
+            const codeBlock = document.getElementById('codeBlock');
+
+            if(!prompt) return alert("Please describe a model first.");
+
+            btn.disabled = true;
+            btn.innerText = "Processing...";
+            output.classList.remove('hidden');
+            codeBlock.innerText = "";
+
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt })
+                });
+                
+                const data = await response.json();
+                status.innerText = "Synthesis Complete. Model Generated:";
+                codeBlock.innerText = data.code || JSON.stringify(data, null, 2);
+            } catch (err) {
+                status.innerText = "Error: Connection to OMEGA failed.";
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Create Model";
+            }
+        }
+    </script>
+</body>
+</html>

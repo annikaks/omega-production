@@ -7,12 +7,19 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import anthropic
 from concurrent.futures import ProcessPoolExecutor
+from fastapi.staticfiles import StaticFiles  # <-- Add this
+from fastapi.responses import FileResponse
 
 from generate import AlgoGen 
 from evaluate import BenchmarkSuite, eval_one_benchmark_task, BenchmarkTask
 from metaprompt import LOG_FILE, GENERATION_DIRECTORY_PATH
 
 app = FastAPI(title="OMEGA API")
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+async def read_index():
+    return FileResponse('static/index.html')
 
 algo_gen = None
 suite = None
@@ -49,7 +56,7 @@ def eval_single_ds(args):
     m_name, d_name, cell, err, stats = eval_one_benchmark_task(task)
     return m_name, d_name, cell, stats
 
-@app.post("/synthesize")
+@app.post("/generate")
 async def handle_synthesis(req: SynthesisRequest):
     try:
         # generate
