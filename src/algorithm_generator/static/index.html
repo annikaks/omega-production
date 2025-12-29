@@ -1,96 +1,228 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Infinity | OMEGA Model Lab</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Crimson Pro', serif; background-color: #F2EEE3; }
-        .gold-border { border-color: #d4af37; }
-        .gold-bg { background-color: #D4AF37; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Infinity | OMEGA Arena</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600&display=swap" rel="stylesheet">
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    body { font-family: 'Crimson Pro', serif; background-color: #F8F7F2; }
+    .gold-bg { background-color: #D4AF37; }
+    .gold-text { color: #D4AF37; }
+    .equation-box { background: rgba(212, 175, 55, 0.03); border: 1px dashed rgba(212, 175, 55, 0.3); }
+    .summary-text { font-style: italic; line-height: 1.4; animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+    .loading-pulse { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+    .transition-transform { transition: transform 0.3s ease; }
+  </style>
 </head>
-<body class="text-gray-800">
 
-    <nav class="bg-white border-b border-gray-100 w-full fixed top-0 z-50">
-        <div class="max-w-7xl mx-auto px-10 py-8 flex justify-between items-center">
-            <div class="text-3xl tracking-[0.3em] font-light text-[#b8962e] font-sans">
-                INFINITY
-            </div>
-            
-            <div class="space-x-12 text-[14px] uppercase tracking-[0.25em] font-bold text-[#757575]">
-                <a href="#" class="hover:text-black transition-colors">Model Lab</a>
-                <a href="/docs" class="hover:text-black transition-colors">API Docs</a>
-            </div>
+<body class="text-gray-800 pb-20">
+  <nav class="bg-white/80 backdrop-blur-md border-b border-gray-100 w-full fixed top-0 z-50">
+    <div class="max-w-5xl mx-auto px-6 py-6 flex justify-between items-center">
+      <div class="text-2xl tracking-[0.3em] font-light gold-text font-sans">INFINITY</div>
+      <div class="text-[12px] uppercase tracking-[0.2em] font-bold text-gray-400">OMEGA Arena v1.2</div>
+    </div>
+  </nav>
+
+  <div class="h-32"></div>
+
+  <main class="max-w-4xl mx-auto px-6">
+    <div class="text-center mb-10">
+      <h1 class="text-5xl mb-4 font-light">Architect your intelligence.</h1>
+      <p class="text-gray-400 italic text-lg">Every generation is benchmarked against the global leaderboard.</p>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 mb-8">
+      <textarea id="prompt" rows="3"
+        class="w-full text-2xl font-light border-none focus:ring-0 placeholder-gray-200 resize-none"
+        placeholder="Describe a novel architecture..."></textarea>
+      <div class="mt-6 pt-6 border-t border-gray-50 flex justify-between items-center">
+        <div id="statusLabel" class="text-sm text-gray-400 font-sans">Ready for synthesis</div>
+        <button onclick="generateModel()" id="btn"
+          class="gold-bg text-white px-10 py-3 rounded-full hover:scale-105 transition-all shadow-lg font-semibold tracking-wide">
+          Generate & Rank
+        </button>
+      </div>
+    </div>
+
+    <div class="equation-box rounded-xl p-6 mb-8 text-center">
+        <div class="text-[10px] uppercase tracking-widest text-gray-400 mb-2 font-sans">Ranking Algorithm: Min-Max Normalization</div>
+        <div class="text-lg text-gray-700">
+            $$Score = \frac{1}{n} \sum_{i=1}^{n} \frac{x_i - Min_i}{Max_i - Min_i}$$
         </div>
-    </nav>
-    
-    <div class="h-32"></div>
-
-    <main class="max-w-4xl mx-auto pt-20 px-6">
-        <div class="text-center mb-16">
-            <h1 class="text-6xl mb-4 font-light">Make your own ML model.</h1>
-            <p class="text-gray-400 italic text-xl">Describe your architecture and let OMEGA synthesize the pathways.</p>
+        <div class="text-[11px] text-gray-400 mt-2 font-sans italic">
+            Where \(x\) is accuracy, \(Min\) is the global floor, and \(Max\) is the record.
         </div>
+    </div>
 
-        <div class="bg-white rounded-xl shadow-2xl p-8 border border-gray-100">
-            <textarea id="prompt" rows="5" 
-                class="w-full text-2xl font-light border-none focus:ring-0 placeholder-gray-200 resize-none"
-                placeholder="e.g., A hybrid ensemble that prioritizes low-latency for tabular fraud detection..."></textarea>
-            
-            <div class="mt-8 pt-6 border-t border-gray-50 flex justify-between items-center">
-                <div class="flex gap-4">
-                    <span class="px-4 py-2 bg-gray-50 rounded-full text-xs text-gray-400 border border-gray-100">V1.0.4-Stable</span>
-                </div>
-                <button onclick="generateModel()" id="btn" class="gold-bg text-white px-10 py-3 rounded-full hover:opacity-90 transition-all shadow-lg font-semibold tracking-wide">
-                    Create Model
-                </button>
+    <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 mb-8">
+        <button onclick="toggleDetails()" class="w-full flex items-center justify-between group">
+          <h2 class="text-2xl font-light">Global Benchmarking Details</h2>
+          <span id="toggleIcon" class="text-gray-400 group-hover:text-black transition-transform">▼</span>
+        </button>
+        <div id="detailsGrid" class="hidden mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+      <div class="flex items-center justify-between mb-8 border-b border-gray-50 pb-4">
+        <h2 class="text-3xl font-light">Global Leaderboard</h2>
+        <div class="text-right">
+            <div class="text-[10px] uppercase tracking-widest text-gray-400">Metric</div>
+            <div class="text-sm font-bold gold-text uppercase">Mean Accuracy</div>
+        </div>
+      </div>
+      <div id="leaderboardList" class="space-y-4"></div>
+    </div>
+  </main>
+
+  <script>
+    let lastGeneratedModel = null;
+    let detailsVisible = false;
+    let summariesCache = {}; 
+
+    // --- Detail Toggle ---
+    async function toggleDetails() {
+      const grid = document.getElementById("detailsGrid");
+      const icon = document.getElementById("toggleIcon");
+      detailsVisible = !detailsVisible;
+      if (detailsVisible) {
+        grid.classList.remove("hidden");
+        icon.style.transform = "rotate(180deg)";
+        await refreshDatasetStats();
+      } else {
+        grid.classList.add("hidden");
+        icon.style.transform = "rotate(0deg)";
+      }
+    }
+
+    async function refreshDatasetStats() {
+      const grid = document.getElementById("detailsGrid");
+      try {
+        const res = await fetch("/dataset-stats");
+        const data = await res.json();
+        grid.innerHTML = "";
+        for (const [name, bounds] of Object.entries(data.stats)) {
+          const card = document.createElement("div");
+          card.className = "p-4 rounded-xl bg-gray-50 border border-gray-100 shadow-sm";
+          card.innerHTML = `
+            <div class="text-sm uppercase tracking-tight text-gray-700 font-bold mb-3 truncate border-b border-gray-200 pb-1">${name}</div>
+            <div class="flex justify-between items-center text-[11px] font-semibold">
+              <div class="text-red-500"><span class="opacity-50 text-[9px] mr-1">MIN</span>${(bounds.min * 100).toFixed(1)}%</div>
+              <div class="text-green-600"><span class="opacity-50 text-[9px] mr-1">MAX</span>${(bounds.max * 100).toFixed(1)}%</div>
             </div>
-        </div>
-
-        <div id="output" class="mt-12 hidden">
-            <div class="bg-black text-green-400 p-6 rounded-lg font-mono text-sm overflow-x-auto shadow-inner">
-                <p id="status" class="mb-4 text-white animate-pulse font-sans">Synthesizing...</p>
-                <pre id="codeBlock"></pre>
-            </div>
-        </div>
-    </main>
-
-    <script>
-        async function generateModel() {
-            const prompt = document.getElementById('prompt').value;
-            const btn = document.getElementById('btn');
-            const output = document.getElementById('output');
-            const status = document.getElementById('status');
-            const codeBlock = document.getElementById('codeBlock');
-
-            if(!prompt) return alert("Please describe a model first.");
-
-            btn.disabled = true;
-            btn.innerText = "Processing...";
-            output.classList.remove('hidden');
-            codeBlock.innerText = "";
-
-            try {
-                const response = await fetch('/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt })
-                });
-                
-                const data = await response.json();
-                status.innerText = "Synthesis Complete. Model Generated:";
-                codeBlock.innerText = data.code || JSON.stringify(data, null, 2);
-            } catch (err) {
-                status.innerText = "Error: Connection to OMEGA failed.";
-                console.error(err);
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "Create Model";
-            }
+            <div class="w-full bg-gray-200 h-1.5 mt-3 rounded-full overflow-hidden">
+              <div class="bg-green-500 h-full transition-all duration-500" style="width: ${bounds.max * 100}%"></div>
+            </div>`;
+          grid.appendChild(card);
         }
-    </script>
+      } catch (e) { console.error(e); }
+    }
+
+    // --- Generation ---
+    async function generateModel() {
+      const prompt = document.getElementById('prompt').value;
+      const btn = document.getElementById('btn');
+      const status = document.getElementById('statusLabel');
+      if (!prompt) return alert("Enter description.");
+      btn.disabled = true;
+      btn.classList.add('opacity-50');
+      status.innerText = "Synthesizing...";
+      try {
+        const response = await fetch('/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description: prompt })
+        });
+        const data = await response.json();
+        if (response.ok) {
+          lastGeneratedModel = data;
+          const vals = Object.values(data.metrics);
+          lastGeneratedModel.display_acc = vals.reduce((a,b)=>a+b,0)/vals.length;
+          status.innerText = "Ranked successfully.";
+          await refreshLeaderboard();
+        } else { throw new Error(data.detail); }
+      } catch (err) { alert(err.message); status.innerText = "Error."; }
+      finally { btn.disabled = false; btn.classList.remove('opacity-50'); }
+    }
+
+    // --- Summary Toggle ---
+    async function toggleSummary(modelId, originalRank) {
+        const container = document.getElementById(`content-${modelId}`);
+        const isShowingSummary = container.getAttribute('data-state') === 'summary';
+
+        if (isShowingSummary) {
+            // Revert to list view
+            await refreshLeaderboard();
+            return;
+        }
+
+        container.setAttribute('data-state', 'summary');
+        container.innerHTML = `<div class="text-sm gold-text loading-pulse italic">Interpreting mathematical intuition...</div>`;
+
+        try {
+            let summary = summariesCache[modelId];
+            if (!summary) {
+                const res = await fetch(`/summarize/${modelId}`);
+                const data = await res.json();
+                summary = data.summary;
+                summariesCache[modelId] = summary;
+            }
+            container.innerHTML = `<div class="summary-text text-sm text-gray-600 py-1 pr-4 border-l-2 border-[#D4AF37] pl-4">${summary}</div>`;
+        } catch (e) {
+            container.innerHTML = `<div class="text-xs text-red-400">Analysis unavailable.</div>`;
+        }
+    }
+
+    // --- Leaderboard ---
+    async function refreshLeaderboard() {
+      const list = document.getElementById("leaderboardList");
+      try {
+        const res = await fetch("/leaderboard");
+        const data = await res.json();
+        const top10 = data.top_10 || [];
+        list.innerHTML = "";
+        let displayList = [...top10];
+        const userInTop10 = lastGeneratedModel && top10.some(m => m.id === lastGeneratedModel.id);
+        if (lastGeneratedModel && !userInTop10) {
+          displayList.push({ isSpacer: true });
+          displayList.push(lastGeneratedModel);
+        }
+
+        displayList.forEach((m, idx) => {
+          if (m.isSpacer) {
+            list.innerHTML += `<div class="py-2 flex justify-center opacity-20 gap-1"><div class="h-1 w-1 bg-black rounded-full"></div><div class="h-1 w-1 bg-black rounded-full"></div><div class="h-1 w-1 bg-black rounded-full"></div></div>`;
+            return;
+          }
+          const isCurrent = lastGeneratedModel && m.id === lastGeneratedModel.id;
+          const rankLabel = userInTop10 || !isCurrent ? `#${idx + 1}` : "—";
+          const card = document.createElement("div");
+          card.className = `p-5 rounded-xl border cursor-pointer transition-all hover:border-gray-300 ${isCurrent ? 'border-[#D4AF37] bg-yellow-50 shadow-md' : 'border-gray-100 bg-gray-50'}`;
+          card.onclick = () => toggleSummary(m.id, rankLabel);
+
+          card.innerHTML = `
+            <div class="flex items-center justify-between">
+              <div id="content-${m.id}" class="flex items-center gap-5 w-full">
+                <span class="text-2xl font-bold ${isCurrent ? 'gold-text' : 'text-gray-300'} font-sans w-12">${rankLabel}</span>
+                <div>
+                  <div class="font-semibold text-lg">${m.name} ${isCurrent ? '<span class="ml-2 text-[10px] gold-bg text-white px-2 py-0.5 rounded-full uppercase">Current</span>' : ''}</div>
+                  <div class="text-xs text-gray-400 font-sans tracking-tight">${m.id.substring(0,8)}...</div>
+                </div>
+              </div>
+              <div class="text-right ml-4">
+                <div class="text-2xl font-bold gold-text">${(m.display_acc * 100).toFixed(2)}%</div>
+              </div>
+            </div>`;
+          list.appendChild(card);
+        });
+      } catch (e) { console.error(e); }
+    }
+
+    refreshLeaderboard();
+  </script>
 </body>
 </html>

@@ -1,106 +1,204 @@
 import os
 import uuid
+import json
+import time
 import importlib.util
 import traceback
+from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor
+from typing import Optional, Dict, Any, List
+
 import uvicorn
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import anthropic
-from concurrent.futures import ProcessPoolExecutor
-from fastapi.staticfiles import StaticFiles  # <-- Add this
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
-from generate import AlgoGen 
+import anthropic
+
+# Assuming these are your local files
+from generate import AlgoGen
 from evaluate import BenchmarkSuite, eval_one_benchmark_task, BenchmarkTask
 from metaprompt import LOG_FILE, GENERATION_DIRECTORY_PATH
+from describe import ModelAnalyzer 
 
-app = FastAPI(title="OMEGA API")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+STORAGE_DIR = BASE_DIR / "storage"
+BOUNDS_PATH = STORAGE_DIR / "bounds.json"
+MODELS_DATA_PATH = STORAGE_DIR / "all_models.json"
+STORAGE_DIR.mkdir(exist_ok=True)
 
-@app.get("/")
-async def read_index():
-    return FileResponse('static/index.html')
+def _read_json(path: Path, default: Any):
+    try:
+        if path.exists():
+            return json.loads(path.read_text())
+    except Exception: pass
+    return default
+
+def _write_json_atomic(path: Path, data: Any):
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2))
+    tmp.replace(path)
+
+_LOCK_PATH = STORAGE_DIR / ".lock"
+def _acquire_lock(timeout_s: float = 3.0):
+    t0 = time.time()
+    while True:
+        try:
+            fd = os.open(str(_LOCK_PATH), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(fd)
+            return
+        except FileExistsError:
+            if time.time() - t0 > timeout_s: raise RuntimeError("Lock timeout")
+            time.sleep(0.05)
+def _release_lock():
+    _LOCK_PATH.unlink(missing_ok=True)
 
 algo_gen = None
 suite = None
+analyzer = None 
+app = FastAPI(title="OMEGA Arena")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.on_event("startup")
 def startup_event():
-    """This ensures data loads ONCE in the parent process only"""
-    global algo_gen, suite
-    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-    algo_gen = AlgoGen(anthropic_client=client, log_file=LOG_FILE)
+    global algo_gen, suite, analyzer
+    if not MODELS_DATA_PATH.exists():
+        _write_json_atomic(MODELS_DATA_PATH, {"models": []})
+
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key: raise RuntimeError("ANTHROPIC_API_KEY not set")
     
+    client = anthropic.Anthropic(api_key=api_key)
+    algo_gen = AlgoGen(anthropic_client=client, log_file=LOG_FILE)
     suite = BenchmarkSuite()
+    analyzer = ModelAnalyzer(anthropic_client=client) 
+
 
 class SynthesisRequest(BaseModel):
     description: str
 
 def eval_single_ds(args):
-    """
-    Worker function. Note: We do NOT refer to the global 'suite' here.
-    Everything the worker needs is passed in via 'args'.
-    """
     dataset_name, model_content, class_name, X_train, X_test, y_train, y_test = args
-    
     spec = importlib.util.spec_from_loader("temp_mod", loader=None)
     module = importlib.util.module_from_spec(spec)
     exec(model_content, module.__dict__)
-    
     Cls = getattr(module, class_name)
     model_instance = Cls()
-    
-    from evaluate import BenchmarkTask, eval_one_benchmark_task
-    task = BenchmarkTask(model_instance, class_name, dataset_name, X_train, X_test, y_train, y_test)
+    task = BenchmarkTask(model=model_instance, model_name=class_name, dataset_name=dataset_name,
+                         X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
     m_name, d_name, cell, err, stats = eval_one_benchmark_task(task)
     return m_name, d_name, cell, stats
+
+def update_bounds_and_rankings(new_metrics: Dict[str, float]):
+    bounds = _read_json(BOUNDS_PATH, {})
+    bounds_changed = False
+    for ds, val in new_metrics.items():
+        if ds not in bounds:
+            bounds[ds] = {"min": val, "max": val}
+            bounds_changed = True
+        else:
+            if val < bounds[ds]["min"]: bounds[ds]["min"] = val; bounds_changed = True
+            if val > bounds[ds]["max"]: bounds[ds]["max"] = val; bounds_changed = True
+    if bounds_changed: _write_json_atomic(BOUNDS_PATH, bounds)
+    
+    data = _read_json(MODELS_DATA_PATH, {"models": []})
+    for m in data["models"]:
+        rel_scores = []
+        for ds, val in m["metrics"].items():
+            mn, mx = bounds[ds]["min"], bounds[ds]["max"]
+            denom = mx - mn
+            rel_scores.append((val - mn) / denom if denom > 0 else 1.0)
+        m["total_score"] = sum(rel_scores) / len(rel_scores) if rel_scores else 0
+    _write_json_atomic(MODELS_DATA_PATH, data)
+
+@app.get("/")
+async def read_index():
+    return FileResponse(str(STATIC_DIR / "index.html"))
 
 @app.post("/generate")
 async def handle_synthesis(req: SynthesisRequest):
     try:
-        # generate
-        generated_files_result = algo_gen.parallel_genML([req.description])
-        if not generated_files_result or generated_files_result[0] is None:
-            raise Exception("Synthesis engine failed to generate a model.")
-            
-        fname, cname, _ = generated_files_result[0]
-        fpath = os.path.join(GENERATION_DIRECTORY_PATH, fname)
-        with open(fpath, "r") as f:
+        gen_result = algo_gen.parallel_genML([req.description])
+        fname, cname, _ = gen_result[0]
+        with open(os.path.join(GENERATION_DIRECTORY_PATH, fname), "r") as f:
             code_string = f.read()
 
-        # evaluate
-        tasks = []
-        for name, data in suite.datasets.items():
-            X_train, X_test, y_train, y_test = data
-            tasks.append((name, code_string, cname, X_train, X_test, y_train, y_test))
-        
+        tasks = [(n, code_string, cname, d[0], d[1], d[2], d[3]) for n, d in suite.datasets.items()]
         with ProcessPoolExecutor(max_workers=4) as executor:
             results_list = list(executor.map(eval_single_ds, tasks))
 
-        suite.results = {cname: {}}
-        suite.runtime_stats = {cname: {}}
-
-        for m_name, d_name, cell, stats in results_list:
-            suite.results[m_name][d_name] = cell
-            suite.runtime_stats[m_name][d_name] = stats
-
-        # tex generation
-        latex_path = os.path.join(GENERATION_DIRECTORY_PATH, f"{cname}.tex")
-        suite.save_latex_table_multirow(filepath=latex_path)
-        
-        with open(latex_path, "r") as f:
-            latex_table = f.read()
-            
-        return {
-            "id": str(uuid.uuid4()),
-            "script": code_string,
-            "metrics": {d_name: suite.results[cname][d_name].get("Accuracy", 0) for d_name in suite.dataset_names},
-            "latex": latex_table
+        metrics_out = {d_n: float(c.get("Accuracy", 0.0)) for _, d_n, c, _ in results_list}
+        new_id = str(uuid.uuid4())
+        model_entry = {"id": new_id, "name": cname, "filename": fname, "description": req.description, "metrics": metrics_out, "timestamp": time.time()
         }
+
+        try:
+            _acquire_lock()
+            data = _read_json(MODELS_DATA_PATH, {"models": []})
+            data["models"].append(model_entry)
+            _write_json_atomic(MODELS_DATA_PATH, data)
+            update_bounds_and_rankings(metrics_out)
+        finally: _release_lock()
+        return {**model_entry, "script": code_string}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/leaderboard")
+def get_leaderboard():
+    data = _read_json(MODELS_DATA_PATH, {"models": []})
+    models = data.get("models", [])
+    models.sort(key=lambda x: x.get("total_score", 0), reverse=True)
+    
+    output = []
+    for m in models[:10]:
+        avg = sum(m["metrics"].values()) / len(m["metrics"]) if m["metrics"] else 0
+        output.append({
+            "id": m["id"], 
+            "name": m["name"], 
+            "display_acc": avg, 
+            "score": m.get("total_score", 0),
+            "summary": m.get("summary", None)
+        })
+    return {"top_10": output}
+
+@app.get("/summarize/{model_id}")
+async def get_summary(model_id: str):
+    global analyzer 
+    if analyzer is None:
+        raise HTTPException(status_code=503, detail="Analyzer not initialized")
+        
+    try:
+        _acquire_lock()
+        data = _read_json(MODELS_DATA_PATH, {"models": []})
+        m = next((x for x in data["models"] if x["id"] == model_id), None)
+        if not m: raise HTTPException(status_code=404, detail="Model not found")
+        
+        if "summary" in m and m["summary"]: 
+            return {"summary": m["summary"]}
+
+        filename = m.get("filename")
+        if not filename:
+            filename = f"{m['name']}.py"
+
+        summary = analyzer.describe_single(GENERATION_DIRECTORY_PATH, filename)
+        
+        if " : " in summary:
+            summary = summary.split(" : ", 1)[1]
+        
+        m["summary"] = summary
+        _write_json_atomic(MODELS_DATA_PATH, data)
+        return {"summary": summary}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally: _release_lock()
+
+@app.get("/dataset-stats")
+def get_dataset_stats():
+    return {"stats": dict(sorted(_read_json(BOUNDS_PATH, {}).items()))}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)
