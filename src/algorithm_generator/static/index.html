@@ -152,6 +152,7 @@
 
     // --- Summary Toggle ---
     async function toggleSummary(modelId, originalRank) {
+        if (modelId.startsWith('sklearn-')) return;
         const container = document.getElementById(`content-${modelId}`);
         const isShowingSummary = container.getAttribute('data-state') === 'summary';
 
@@ -194,31 +195,53 @@
         }
 
         displayList.forEach((m, idx) => {
-          if (m.isSpacer) {
-            list.innerHTML += `<div class="py-2 flex justify-center opacity-20 gap-1"><div class="h-1 w-1 bg-black rounded-full"></div><div class="h-1 w-1 bg-black rounded-full"></div><div class="h-1 w-1 bg-black rounded-full"></div></div>`;
-            return;
-          }
-          const isCurrent = lastGeneratedModel && m.id === lastGeneratedModel.id;
-          const rankLabel = userInTop10 || !isCurrent ? `#${idx + 1}` : "—";
-          const card = document.createElement("div");
-          card.className = `p-5 rounded-xl border cursor-pointer transition-all hover:border-gray-300 ${isCurrent ? 'border-[#D4AF37] bg-yellow-50 shadow-md' : 'border-gray-100 bg-gray-50'}`;
-          card.onclick = () => toggleSummary(m.id, rankLabel);
+            if (m.isSpacer) {
+                list.innerHTML += `<div class="py-2 flex justify-center opacity-20 gap-1"><div class="h-1 w-1 bg-black rounded-full"></div><div class="h-1 w-1 bg-black rounded-full"></div><div class="h-1 w-1 bg-black rounded-full"></div></div>`;
+                return;
+            }
+            const isCurrent = lastGeneratedModel && m.id === lastGeneratedModel.id;
+            const isBaseline = m.is_baseline;
+            const rankLabel = userInTop10 || !isCurrent ? `#${idx + 1}` : "—";
+            
+            const card = document.createElement("div");
+            
+            let bgColor = "bg-gray-50 border-gray-100";
+            let textColor = "text-gray-300";
+            if (isCurrent) {
+                bgColor = "border-[#D4AF37] bg-yellow-50 shadow-md";
+                textColor = "gold-text";
+            } else if (isBaseline) {
+                bgColor = "border-blue-200 bg-blue-50 shadow-sm";
+                textColor = "text-blue-400";
+            }
 
-          card.innerHTML = `
-            <div class="flex items-center justify-between">
-              <div id="content-${m.id}" class="flex items-center gap-5 w-full">
-                <span class="text-2xl font-bold ${isCurrent ? 'gold-text' : 'text-gray-300'} font-sans w-12">${rankLabel}</span>
-                <div>
-                  <div class="font-semibold text-lg">${m.name} ${isCurrent ? '<span class="ml-2 text-[10px] gold-bg text-white px-2 py-0.5 rounded-full uppercase">Current</span>' : ''}</div>
-                  <div class="text-xs text-gray-400 font-sans tracking-tight">${m.id.substring(0,8)}...</div>
+            card.className = `p-5 rounded-xl border cursor-pointer transition-all hover:border-blue-300 ${bgColor}`;
+            
+            if (!isBaseline) {
+                card.onclick = () => toggleSummary(m.id, rankLabel);
+            }
+
+            card.innerHTML = `
+                <div class="flex items-center justify-between">
+                <div id="content-${m.id}" class="flex items-center gap-5 w-full">
+                    <span class="text-2xl font-bold ${textColor} font-sans w-12">${rankLabel}</span>
+                    <div>
+                    <div class="font-semibold text-lg">
+                        ${m.name} 
+                        ${isCurrent ? '<span class="ml-2 text-[10px] gold-bg text-white px-2 py-0.5 rounded-full uppercase">Current</span>' : ''}
+                        ${isBaseline ? '<span class="ml-2 text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full uppercase">Baseline</span>' : ''}
+                    </div>
+                    <div class="text-xs text-gray-400 font-sans tracking-tight">${m.id.substring(0,8)}...</div>
+                    </div>
                 </div>
-              </div>
-              <div class="text-right ml-4">
-                <div class="text-2xl font-bold gold-text">${(m.display_acc * 100).toFixed(2)}%</div>
-              </div>
-            </div>`;
-          list.appendChild(card);
-        });
+                <div class="text-right ml-4">
+                    <div class="text-2xl font-bold ${isBaseline ? 'text-blue-600' : 'gold-text'}">
+                        ${(m.display_acc * 100).toFixed(2)}%
+                    </div>
+                </div>
+                </div>`;
+            list.appendChild(card);
+            });
       } catch (e) { console.error(e); }
     }
 
