@@ -150,28 +150,33 @@ async def handle_synthesis(req: SynthesisRequest):
 @app.get("/leaderboard")
 def get_leaderboard():
     data = _read_json(MODELS_DATA_PATH, {"models": []})
-    all_entries = data.get("models", []) + SKLEARN_BENCHMARKS
+    user_models = data.get("models", [])
+    for m in user_models:
+        m["is_baseline"] = False
+
+    all_entries = user_models + SKLEARN_BENCHMARKS
     
-    # Recalculate Aggregates for ALL (Real Mean Accuracy)
     for m in all_entries:
         vals = list(m["metrics"].values())
         m["display_acc"] = sum(vals) / len(vals) if vals else 0
-        # We still use the total_score (Z-score/Min-Max) for the actual sorting rank
-        # If baseline doesn't have a score yet, use display_acc as a fallback for sorting
         if "total_score" not in m:
             m["total_score"] = m["display_acc"]
 
     all_entries.sort(key=lambda x: x.get("total_score", 0), reverse=True)
     
-    return {"top_10": [
-        {
-            "id": m["id"], 
-            "name": m["name"], 
-            "display_acc": m["display_acc"], 
-            "is_baseline": m.get("is_baseline", False),
-            "summary": m.get("summary", "Scikit-Learn Standard Implementation") if m.get("is_baseline") else m.get("summary")
-        } for m in all_entries
-    ]}
+    top_entries = all_entries[:15]
+    
+    return {
+        "ranked_list": [
+            {
+                "id": m["id"], 
+                "name": m["name"], 
+                "display_acc": m["display_acc"], 
+                "is_baseline": m.get("is_baseline", False),
+                "summary": m.get("summary") if not m.get("is_baseline") else "Scikit-Learn Standard"
+            } for m in top_entries
+        ]
+    }
 
 @app.get("/summarize/{model_id}")
 async def get_summary(model_id: str):

@@ -92,7 +92,6 @@
     let detailsVisible = false;
     let summariesCache = {}; 
 
-    // --- Detail Toggle ---
     async function toggleDetails() {
       const grid = document.getElementById("detailsGrid");
       const icon = document.getElementById("toggleIcon");
@@ -130,7 +129,6 @@
       } catch (e) { console.error(e); }
     }
 
-    // --- Generation ---
     async function generateModel() {
       const prompt = document.getElementById('prompt').value;
       const btn = document.getElementById('btn');
@@ -157,14 +155,12 @@
       finally { btn.disabled = false; btn.classList.remove('opacity-50'); }
     }
 
-    // --- Summary Toggle ---
-    async function toggleSummary(modelId, originalRank) {
+    async function toggleSummary(modelId, rankText) {
         if (modelId.startsWith('sklearn-')) return;
         const container = document.getElementById(`content-${modelId}`);
         const isShowingSummary = container.getAttribute('data-state') === 'summary';
 
         if (isShowingSummary) {
-            // Revert to list view
             await refreshLeaderboard();
             return;
         }
@@ -186,69 +182,71 @@
         }
     }
 
-    // --- Leaderboard ---
     async function refreshLeaderboard() {
-      const list = document.getElementById("leaderboardList");
-      try {
+    const list = document.getElementById("leaderboardList");
+    try {
         const res = await fetch("/leaderboard");
         const data = await res.json();
-        const top10 = data.top_10 || [];
+        
+        const rankedList = data.ranked_list || [];
         list.innerHTML = "";
-        let displayList = [...top10];
-        const userInTop10 = lastGeneratedModel && top10.some(m => m.id === lastGeneratedModel.id);
-        if (lastGeneratedModel && !userInTop10) {
-          displayList.push({ isSpacer: true });
-          displayList.push(lastGeneratedModel);
+
+        const createCard = (m, rank) => {
+        const isCurrent = lastGeneratedModel && m.id === lastGeneratedModel.id;
+        const isBaseline = m.is_baseline;
+        const card = document.createElement("div");
+        
+        let bgColor = "bg-gray-50 border-gray-100";
+        let textColor = "text-gray-300";
+        let cursor = "cursor-pointer hover:border-gray-300";
+        let scoreColor = "gold-text";
+
+        if (isBaseline) {
+            bgColor = "bg-blue-50 border-blue-200 shadow-sm";
+            textColor = "text-blue-400";
+            scoreColor = "text-blue-600";
+            cursor = "cursor-default";
+        } else if (isCurrent) {
+            bgColor = "bg-yellow-50 border-[#D4AF37] shadow-md ring-1 ring-[#D4AF37]";
+            textColor = "gold-text";
         }
 
-        displayList.forEach((m, idx) => {
-            if (m.isSpacer) {
-                list.innerHTML += `<div class="py-2 flex justify-center opacity-20 gap-1"><div class="h-1 w-1 bg-black rounded-full"></div><div class="h-1 w-1 bg-black rounded-full"></div><div class="h-1 w-1 bg-black rounded-full"></div></div>`;
-                return;
-            }
-            const isCurrent = lastGeneratedModel && m.id === lastGeneratedModel.id;
-            const isBaseline = m.is_baseline;
-            const rankLabel = userInTop10 || !isCurrent ? `#${idx + 1}` : "—";
-            
-            const card = document.createElement("div");
-            
-            let bgColor = "bg-gray-50 border-gray-100";
-            let textColor = "text-gray-300";
-            if (isCurrent) {
-                bgColor = "border-[#D4AF37] bg-yellow-50 shadow-md";
-                textColor = "gold-text";
-            } else if (isBaseline) {
-                bgColor = "border-blue-200 bg-blue-50 shadow-sm";
-                textColor = "text-blue-400";
-            }
+        card.className = `p-5 rounded-xl border transition-all ${bgColor} ${cursor} mb-4`;
+        if (!isBaseline) card.onclick = () => toggleSummary(m.id, rank);
 
-            card.className = `p-5 rounded-xl border cursor-pointer transition-all hover:border-blue-300 ${bgColor}`;
-            
-            if (!isBaseline) {
-                card.onclick = () => toggleSummary(m.id, rankLabel);
-            }
+        card.innerHTML = `
+            <div class="flex items-center justify-between">
+            <div id="content-${m.id}" class="flex items-center gap-5 w-full">
+                <span class="text-2xl font-bold ${textColor} font-sans w-12">${rank}</span>
+                <div>
+                <div class="font-semibold text-lg">
+                    ${m.name} 
+                    ${isCurrent ? '<span class="ml-2 text-[10px] gold-bg text-white px-2 py-0.5 rounded-full uppercase">Current Result</span>' : ''}
+                    ${isBaseline ? '<span class="ml-2 text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full uppercase">Baseline</span>' : ''}
+                </div>
+                <div class="text-xs text-gray-400 font-sans tracking-tight">${m.id.substring(0,8)}...</div>
+                </div>
+            </div>
+            <div class="text-right ml-4">
+                <div class="text-2xl font-bold ${scoreColor}">${(m.display_acc * 100).toFixed(2)}%</div>
+            </div>
+            </div>`;
+        return card;
+        };
 
-            card.innerHTML = `
-                <div class="flex items-center justify-between">
-                <div id="content-${m.id}" class="flex items-center gap-5 w-full">
-                    <span class="text-2xl font-bold ${textColor} font-sans w-12">${rankLabel}</span>
-                    <div>
-                    <div class="font-semibold text-lg">
-                        ${m.name} 
-                        ${isCurrent ? '<span class="ml-2 text-[10px] gold-bg text-white px-2 py-0.5 rounded-full uppercase">Current</span>' : ''}
-                        ${isBaseline ? '<span class="ml-2 text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full uppercase">Baseline</span>' : ''}
-                    </div>
-                    <div class="text-xs text-gray-400 font-sans tracking-tight">${m.id.substring(0,8)}...</div>
-                    </div>
-                </div>
-                <div class="text-right ml-4">
-                    <div class="text-2xl font-bold ${isBaseline ? 'text-blue-600' : 'gold-text'}">
-                        ${(m.display_acc * 100).toFixed(2)}%
-                    </div>
-                </div>
-                </div>`;
-            list.appendChild(card);
-            });
+        rankedList.forEach((m, idx) => {
+        list.appendChild(createCard(m, `#${idx + 1}`));
+        });
+
+        const isInList = lastGeneratedModel && rankedList.some(m => m.id === lastGeneratedModel.id);
+        if (lastGeneratedModel && !isInList) {
+        const spacer = document.createElement("div");
+        spacer.className = "flex justify-center py-4 opacity-20";
+        spacer.innerHTML = `<div class="h-1 w-1 bg-black rounded-full mx-1"></div><div class="h-1 w-1 bg-black rounded-full mx-1"></div>`;
+        list.appendChild(spacer);
+        list.appendChild(createCard(lastGeneratedModel, "—"));
+        }
+
       } catch (e) { console.error(e); }
     }
 
