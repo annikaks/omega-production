@@ -28,7 +28,7 @@ class KNNClassifier(BaseEstimator):
             Training data
         y_train : array-like of shape (n_samples,)
             Target values
-        
+            
         Returns
         -------
         self : object
@@ -49,7 +49,7 @@ class KNNClassifier(BaseEstimator):
             First point
         x2 : array-like
             Second point
-        
+            
         Returns
         -------
         distance : float
@@ -70,7 +70,7 @@ class KNNClassifier(BaseEstimator):
         ----------
         x : array-like of shape (n_features,)
             Single sample
-        
+            
         Returns
         -------
         prediction : int or str
@@ -97,7 +97,7 @@ class KNNClassifier(BaseEstimator):
         ----------
         X_test : array-like of shape (n_samples, n_features)
             Test samples
-        
+            
         Returns
         -------
         y_pred : array of shape (n_samples,)

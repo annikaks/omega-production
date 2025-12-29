@@ -1,3 +1,4 @@
 
 from metaomni.api_calls.knn_classifier import *
 from metaomni.api_calls.hybrid_anomaly_ensemble_classifier import *
+from metaomni.api_calls.simple_random_forest_classifier import *

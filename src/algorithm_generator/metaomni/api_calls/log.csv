@@ -1,2 +1,7 @@
 Model,Class,Status,Retries,Errors
 create a simple knn classifier,KNNClassifier,SUCCESS,0,
+write a basic knn model,KNNClassifier,SUCCESS,0,
+"write a basic knn classifier
+",KNNClassifier,SUCCESS,0,
+"can you make a simple random forest classifier
+",SimpleRandomForestClassifier,SUCCESS,0,
