@@ -164,7 +164,7 @@ def get_leaderboard():
 
     all_entries.sort(key=lambda x: x.get("total_score", 0), reverse=True)
     
-    top_entries = all_entries[:15]
+    top_entries = all_entries[:10]
     
     return {
         "ranked_list": [
