@@ -35,13 +35,17 @@ class ModelAnalyzer:
         
     
     def describe_single(self, dir_path, filename):
-        """Generates a summary for a specific file as it is created."""
+        """Generates a summary for a specific file using the exact filename provided by api.py."""
         file_path = os.path.join(dir_path, filename)
         
+        if not os.path.exists(file_path):
+            return f"Error: File {filename} not found at {dir_path}"
+
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 code = f.read()
-                print(f"Generating description for {code[:20]}...")
+                # Use a small snippet for the log
+                print(f"Generating description for {filename}...")
 
             return self.llm_api_call(code, batch=False)
         except Exception as e:
