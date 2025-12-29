@@ -5,3 +5,5 @@ write a basic knn model,KNNClassifier,SUCCESS,0,
 ",KNNClassifier,SUCCESS,0,
 "can you make a simple random forest classifier
 ",SimpleRandomForestClassifier,SUCCESS,0,
+"Synthesize a neuro-symbolic classifier that utilizes a shallow Radial Basis Function (RBF) network to extract non-linear kernels, which are then fed into a symbolic rule-induction engine. The model must dynamically weight the influence of the symbolic rules based on the local density of the training data in the feature space, using a custom implementation of a Gaussian Mixture Model to determine that density",NeuroSymbolicRBFClassifier,FAILED,0,
+"Synthesize a neuro-symbolic classifier that utilizes a shallow Radial Basis Function (RBF) network to extract non-linear kernels, which are then fed into a symbolic rule-induction engine. The model must dynamically weight the influence of the symbolic rules based on the local density of the training data in the feature space, using a custom implementation of a Gaussian Mixture Model to determine that density",NeuroSymbolicRBFClassifier,SUCCESS,0,

@@ -28,8 +28,39 @@
         "Monks-1": 1.0
       },
       "timestamp": 1766999123.201417,
-      "total_score": 0.9,
+      "total_score": 0.9295833333333334,
       "summary": "An ensemble learning method that constructs multiple decision trees during training, where each tree is trained on a bootstrap sample of the data and considers only a random subset of features at each split (feature bagging). Predictions are made by aggregating votes from all trees through majority voting for classification, which reduces overfitting and variance compared to individual decision trees by leveraging the wisdom of crowds principle where uncorrelated weak learners combine to form a strong learner."
+    },
+    {
+      "id": "19f81488-9853-4004-b411-b3f9dbc3e78c",
+      "name": "NeuroSymbolicRBFClassifier",
+      "filename": "neuro_symbolic_rbf_classifier.py",
+      "description": "Synthesize a neuro-symbolic classifier that utilizes a shallow Radial Basis Function (RBF) network to extract non-linear kernels, which are then fed into a symbolic rule-induction engine. The model must dynamically weight the influence of the symbolic rules based on the local density of the training data in the feature space, using a custom implementation of a Gaussian Mixture Model to determine that density",
+      "metrics": {
+        "Iris": 0.7666666666666667,
+        "Wine": 1.0,
+        "Breast Cancer": 0.8245614035087719,
+        "Digits": 0.5777777777777777,
+        "Balance Scale": 0.85,
+        "Blood Transfusion": 0.6266666666666667,
+        "Haberman": 0.6935483870967742,
+        "Seeds": 0.9047619047619048,
+        "Teaching Assistant": 0.5806451612903226,
+        "Zoo": 0.8571428571428571,
+        "Planning Relax": 0.5675675675675675,
+        "Ionosphere": 0.9154929577464789,
+        "Sonar": 0.5476190476190477,
+        "Glass": 0.5116279069767442,
+        "Vehicle": 0.48823529411764705,
+        "Liver Disorders": 0.8664383561643836,
+        "Heart Statlog": 0.7962962962962963,
+        "Pima Indians Diabetes": 0.6233766233766234,
+        "Australian": 0.7366412213740458,
+        "Monks-1": 0.6607142857142857
+      },
+      "timestamp": 1767001273.69254,
+      "total_score": 0.31169753086419755,
+      "summary": "A hybrid classifier that transforms input data into a radial basis function (RBF) feature space using Gaussian kernels centered at K-means cluster centers, then fits a Gaussian Mixture Model for density estimation in this transformed space. It extracts symbolic if-then rules by identifying discriminative RBF activation patterns per class (using threshold-based conditions with confidence and support metrics), and makes predictions by combining rule-based voting weighted by both rule confidence and local GMM density, falling back to nearest-neighbor search when no rules activate."
     }
   ]
 }
