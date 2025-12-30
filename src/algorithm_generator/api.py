@@ -201,8 +201,8 @@ def get_leaderboard():
         user_models.append({
             "id": row['id'],
             "name": row['class_name'],
-            "display_acc": row['aggregate_acc'],
-            "total_score": row['min_max_score'],
+            "raw_acc": row['aggregate_acc'], 
+            "display_acc": row['min_max_score'], 
             "creator_name": row.get('creator_name'),
             "user_prompt": row.get('user_prompt'),
             "is_baseline": row.get('user_prompt') == 'benchmark'
