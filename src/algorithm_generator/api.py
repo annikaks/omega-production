@@ -23,7 +23,6 @@ from generate import AlgoGen
 from evaluate import BenchmarkSuite, eval_one_benchmark_task, BenchmarkTask
 from metaprompt import LOG_FILE, GENERATION_DIRECTORY_PATH
 from describe import ModelAnalyzer 
-from storage.display_benchmarks import SKLEARN_BENCHMARKS
 
 load_dotenv()
 
@@ -82,38 +81,49 @@ class SynthesisRequest(BaseModel):
 
 def eval_single_ds(args):
     dataset_name, model_content, class_name, X_train, X_test, y_train, y_test = args
-    spec = importlib.util.spec_from_loader("temp_mod", loader=None)
-    module = importlib.util.module_from_spec(spec)
-    exec(model_content, module.__dict__)
-    Cls = getattr(module, class_name)
-    model_instance = Cls()
-    task = BenchmarkTask(model=model_instance, model_name=class_name, dataset_name=dataset_name,
-                         X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
-    m_name, d_name, cell, err, stats = eval_one_benchmark_task(task)
-    return m_name, d_name, cell, stats
+    try:
+        spec = importlib.util.spec_from_loader("temp_mod", loader=None)
+        module = importlib.util.module_from_spec(spec)
+        exec(model_content, module.__dict__)
+        Cls = getattr(module, class_name)
+        model_instance = Cls()
+        task = BenchmarkTask(model=model_instance, model_name=class_name, dataset_name=dataset_name,
+                             X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
+        m_name, d_name, cell, err, stats = eval_one_benchmark_task(task)
+        return m_name, d_name, cell, stats
+    except Exception:
+        return class_name, dataset_name, {"Accuracy": 0.0}, {}
 
 def update_bounds_and_calculate_score(new_metrics: Dict[str, float]):
     bounds = _read_json(BOUNDS_PATH, {})
-    clean_metrics = {k: (v if isinstance(v, (int, float)) else 0.0) for k, v in new_metrics.items()}
+    
+    clean_metrics = {k: (float(v) if isinstance(v, (int, float, str)) and str(v).replace('.','',1).isdigit() else 0.0) 
+                     for k, v in new_metrics.items()}
+    
     bounds_changed = False
-    for ds, val in new_metrics.items():
+    for ds, val in clean_metrics.items():
         if ds not in bounds:
             bounds[ds] = {"min": val, "max": val}
             bounds_changed = True
         else:
-            if val < bounds[ds]["min"]: bounds[ds]["min"] = val; bounds_changed = True
-            if val > bounds[ds]["max"]: bounds[ds]["max"] = val; bounds_changed = True
+            if val < bounds[ds]["min"]: 
+                bounds[ds]["min"] = val
+                bounds_changed = True
+            if val > bounds[ds]["max"]: 
+                bounds[ds]["max"] = val
+                bounds_changed = True
     
     if bounds_changed: 
         _write_json_atomic(BOUNDS_PATH, bounds)
     
     rel_scores = []
-    for ds, val in new_metrics.items():
+    for ds, val in clean_metrics.items():
         mn, mx = bounds[ds]["min"], bounds[ds]["max"]
         denom = mx - mn
-        rel_scores.append((val - mn) / denom if denom > 0 else 1.0)
+        score = (val - mn) / denom if denom > 0 else 1.0
+        rel_scores.append(score)
     
-    return sum(rel_scores) / len(rel_scores) if rel_scores else 0
+    return sum(rel_scores) / len(rel_scores) if rel_scores else 0.0
 
 @app.get("/")
 async def read_index():
@@ -137,7 +147,6 @@ async def handle_synthesis(req: SynthesisRequest):
         total_min_max = update_bounds_and_calculate_score(metrics_out)
         eval_time = time.time() - start_time
 
-        # 4. Save to Database
         db_payload = {
             "user_id": req.user_id,
             "creator_name": req.creator_name,
@@ -148,29 +157,28 @@ async def handle_synthesis(req: SynthesisRequest):
             "algorithm_code": code_string,
             "code_hash": hashlib.sha256(code_string.strip().encode()).hexdigest(),
             "eval_time_seconds": eval_time,
-            "aggregate_acc": sum(metrics_out.values()) / len(metrics_out),
+            "aggregate_acc": sum(metrics_out.values()) / len(metrics_out) if metrics_out else 0,
             "min_max_score": total_min_max,
-            # Map metrics to columns
-            "iris_acc": metrics_out.get("Iris"),
-            "wine_acc": metrics_out.get("Wine"),
-            "breast_cancer_acc": metrics_out.get("Breast Cancer"),
-            "digits_acc": metrics_out.get("Digits"),
-            "balance_scale_acc": metrics_out.get("Balance Scale"),
-            "blood_transfusion_acc": metrics_out.get("Blood Transfusion"),
-            "haberman_acc": metrics_out.get("Haberman"),
-            "seeds_acc": metrics_out.get("Seeds"),
-            "teaching_assistant_acc": metrics_out.get("Teaching Assistant"),
-            "zoo_acc": metrics_out.get("Zoo"),
-            "planning_relax_acc": metrics_out.get("Planning Relax"),
-            "ionosphere_acc": metrics_out.get("Ionosphere"),
-            "sonar_acc": metrics_out.get("Sonar"),
-            "glass_acc": metrics_out.get("Glass"),
-            "vehicle_acc": metrics_out.get("Vehicle"),
-            "liver_disorders_acc": metrics_out.get("Liver Disorders"),
-            "heart_statlog_acc": metrics_out.get("Heart Statlog"),
-            "pima_diabetes_acc": metrics_out.get("Pima Indians Diabetes"),
-            "australian_acc": metrics_out.get("Australian"),
-            "monks_1_acc": metrics_out.get("Monks-1")
+            "iris_acc": metrics_out.get("Iris", 0),
+            "wine_acc": metrics_out.get("Wine", 0),
+            "breast_cancer_acc": metrics_out.get("Breast Cancer", 0),
+            "digits_acc": metrics_out.get("Digits", 0),
+            "balance_scale_acc": metrics_out.get("Balance Scale", 0),
+            "blood_transfusion_acc": metrics_out.get("Blood Transfusion", 0),
+            "haberman_acc": metrics_out.get("Haberman", 0),
+            "seeds_acc": metrics_out.get("Seeds", 0),
+            "teaching_assistant_acc": metrics_out.get("Teaching Assistant", 0),
+            "zoo_acc": metrics_out.get("Zoo", 0),
+            "planning_relax_acc": metrics_out.get("Planning Relax", 0),
+            "ionosphere_acc": metrics_out.get("Ionosphere", 0),
+            "sonar_acc": metrics_out.get("Sonar", 0),
+            "glass_acc": metrics_out.get("Glass", 0),
+            "vehicle_acc": metrics_out.get("Vehicle", 0),
+            "liver_disorders_acc": metrics_out.get("Liver Disorders", 0),
+            "heart_statlog_acc": metrics_out.get("Heart Statlog", 0),
+            "pima_diabetes_acc": metrics_out.get("Pima Indians Diabetes", 0),
+            "australian_acc": metrics_out.get("Australian", 0),
+            "monks_1_acc": metrics_out.get("Monks-1", 0)
         }
 
         db_res = supabase.table("algorithms").insert(db_payload).execute()
@@ -199,9 +207,13 @@ def get_leaderboard():
             "user_prompt": row.get('user_prompt'),
             "is_baseline": row.get('user_prompt') == 'benchmark'
         })
-
     
     return {"ranked_list": user_models}
+
+@app.get("/dataset-stats")
+def get_dataset_stats():
+    data = _read_json(BOUNDS_PATH, {})
+    return {"stats": dict(sorted(data.items()))}
 
 @app.get("/summarize/{model_id}")
 async def get_summary(model_id: str):
@@ -217,10 +229,6 @@ async def get_summary(model_id: str):
         return {"summary": summary}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/dataset-stats")
-def get_dataset_stats():
-    return {"stats": dict(sorted(_read_json(BOUNDS_PATH, {}).items()))}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)
