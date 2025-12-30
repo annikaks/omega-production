@@ -223,7 +223,7 @@
 
         const createCard = (m, rank) => {
           const isCurrent = lastGeneratedModel && m.id === lastGeneratedModel.id;
-          const isBaseline = m.is_baseline;
+          const isBaseline = m.user_prompt === 'benchmark' || m.is_baseline === true;
           const card = document.createElement("div");
           
           let bgColor = "bg-gray-50 border-gray-100 hover:border-gray-300";

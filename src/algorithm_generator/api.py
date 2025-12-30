@@ -94,6 +94,7 @@ def eval_single_ds(args):
 
 def update_bounds_and_calculate_score(new_metrics: Dict[str, float]):
     bounds = _read_json(BOUNDS_PATH, {})
+    clean_metrics = {k: (v if isinstance(v, (int, float)) else 0.0) for k, v in new_metrics.items()}
     bounds_changed = False
     for ds, val in new_metrics.items():
         if ds not in bounds:
@@ -183,35 +184,24 @@ async def handle_synthesis(req: SynthesisRequest):
 @app.get("/leaderboard")
 def get_leaderboard():
     res = supabase.table("algorithms") \
-        .select("id, class_name, aggregate_acc, min_max_score, creator_name") \
+        .select("id, class_name, aggregate_acc, min_max_score, creator_name, user_prompt") \
         .order("min_max_score", desc=True) \
-        .limit(10).execute()
+        .execute()
     
     user_models = []
     for row in res.data:
         user_models.append({
             "id": row['id'],
             "name": row['class_name'],
-            "display_acc": row['min_max_score'],
+            "display_acc": row['aggregate_acc'],
             "total_score": row['min_max_score'],
             "creator_name": row.get('creator_name'),
-            "is_baseline": False
+            "user_prompt": row.get('user_prompt'),
+            "is_baseline": row.get('user_prompt') == 'benchmark'
         })
 
-    baselines = []
-    for b in SKLEARN_BENCHMARKS:
-        vals = list(b["metrics"].values())
-        acc = sum(vals) / len(vals)
-        baselines.append({
-            "id": b["id"],
-            "name": b["name"],
-            "display_acc": acc,
-            "total_score": acc,
-            "is_baseline": True
-        })
-
-    all_entries = sorted(user_models + baselines, key=lambda x: x['total_score'], reverse=True)
-    return {"ranked_list": all_entries}
+    
+    return {"ranked_list": user_models}
 
 @app.get("/summarize/{model_id}")
 async def get_summary(model_id: str):
