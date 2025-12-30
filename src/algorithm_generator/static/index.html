@@ -15,97 +15,95 @@
     .equation-box { background: rgba(212, 175, 55, 0.03); border: 1px dashed rgba(212, 175, 55, 0.3); }
     .summary-text { font-style: italic; line-height: 1.4; animation: fadeIn 0.4s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
-    .loading-pulse { animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+    .mjx-container { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
   </style>
 </head>
 
-<body class="text-gray-800 pb-20">
+<body class="text-gray-800 pb-10 md:pb-20">
   <nav class="bg-white/80 backdrop-blur-md border-b border-gray-100 w-full fixed top-0 z-50">
-    <div class="max-w-5xl mx-auto px-6 py-6 flex justify-between items-center">
-      <div class="text-2xl tracking-[0.3em] font-light gold-text font-sans">INFINITY</div>
-      <div class="flex items-center space-x-8 text-[12px] uppercase tracking-[0.25em] font-bold text-gray-400">
-        <a href="/docs" class="hover:text-black transition-colors">API Docs</a>
-        <button id="authBtn" onclick="handleAuth()" class="hover:text-black transition-colors border-l pl-8 border-gray-100">Login</button>
+    <div class="max-w-5xl mx-auto px-4 md:px-6 py-4 md:py-6 flex justify-between items-center">
+      <div class="text-xl md:text-2xl tracking-[0.2em] md:tracking-[0.3em] font-light gold-text font-sans">INFINITY</div>
+      <div class="flex items-center space-x-4 md:space-x-8 text-[10px] md:text-[12px] uppercase tracking-[0.15em] md:tracking-[0.25em] font-bold text-gray-400">
+        <a href="/docs" class="hover:text-black transition-colors hidden sm:block">API Docs</a>
+        <button id="authBtn" onclick="handleAuth()" class="hover:text-black transition-colors sm:border-l sm:pl-8 border-gray-100 uppercase">Login</button>
       </div>
     </div>
   </nav>
 
-  <div class="h-32"></div>
+  <div class="h-24 md:h-32"></div>
 
-  <main class="max-w-4xl mx-auto px-6">
-    <div class="text-center mb-10">
-      <h1 class="text-5xl mb-4 font-light text-gray-900">Make your own ML Model.</h1>
-      <p class="text-gray-400 italic text-lg text-balance">Every generation is benchmarked against the global leaderboard.</p>
+  <main class="max-w-4xl mx-auto px-4 md:px-6">
+    <div class="text-center mb-8 md:mb-10">
+      <h1 class="text-3xl md:text-5xl mb-3 md:mb-4 font-light text-gray-900 leading-tight">Make your own ML Model.</h1>
+      <p class="text-gray-400 italic text-base md:text-lg text-balance px-4">Every generation is benchmarked against the global leaderboard.</p>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 mb-8">
-      <textarea id="prompt" rows="3" class="w-full text-2xl font-light border-none focus:ring-0 placeholder-gray-200 resize-none" placeholder="Describe a novel architecture..."></textarea>
-      <div class="mt-6 pt-6 border-t border-gray-50 flex justify-between items-center">
-        <div id="statusLabel" class="text-sm text-gray-400 font-sans tracking-wide">Ready for synthesis</div>
-        <button onclick="generateModel()" id="btn" class="gold-bg text-white px-10 py-3 rounded-full hover:scale-105 transition-all shadow-lg font-semibold tracking-wide active:scale-95">
+    <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100 mb-6 md:mb-8">
+      <textarea id="prompt" rows="3" class="w-full text-xl md:text-2xl font-light border-none focus:ring-0 placeholder-gray-200 resize-none" placeholder="Describe a novel architecture..."></textarea>
+      <div class="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-gray-50 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div id="statusLabel" class="text-xs md:text-sm text-gray-400 font-sans tracking-wide text-center sm:text-left">Ready for synthesis</div>
+        <button onclick="generateModel()" id="btn" class="w-full sm:w-auto gold-bg text-white px-8 md:px-10 py-3 rounded-full hover:scale-105 transition-all shadow-lg font-semibold tracking-wide active:scale-95 text-sm md:text-base">
           Generate & Rank
         </button>
       </div>
     </div>
 
-    <div class="equation-box rounded-xl p-6 mb-8 text-center">
-        <div class="text-[10px] uppercase tracking-widest text-gray-400 mb-2 font-sans">Ranking Algorithm: Min-Max Normalization</div>
-        <div class="text-lg text-gray-700">
+    <div class="equation-box rounded-xl p-4 md:p-6 mb-6 md:mb-8 text-center overflow-x-auto">
+        <div class="text-[9px] uppercase tracking-widest text-gray-400 mb-2 font-sans">Ranking Algorithm: Min-Max Normalization</div>
+        <div class="text-base md:text-lg text-gray-700 py-2">
             $$Score = \frac{1}{n} \sum_{i=1}^{n} \frac{x_i - Min_i}{Max_i - Min_i}$$
         </div>
-        <div class="text-[11px] text-gray-400 mt-2 font-sans italic">
+        <div class="text-[10px] text-gray-400 mt-2 font-sans italic">
             Where \(x\) is accuracy, \(Min\) is the global floor, and \(Max\) is the record.
         </div>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 mb-8">
+    <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100 mb-6 md:mb-8">
         <button onclick="toggleDetails()" class="w-full flex items-center justify-between group">
-          <h2 class="text-2xl font-light">Global Benchmarking Details</h2>
+          <h2 class="text-xl md:text-2xl font-light">Global Benchmarking Details</h2>
           <span id="toggleIcon" class="text-gray-400 group-hover:text-black transition-transform">▼</span>
         </button>
-        <div id="detailsGrid" class="hidden mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+        <div id="detailsGrid" class="hidden mt-6 md:mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 border-t border-gray-50 pt-6"></div>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-      <div class="flex items-center justify-between mb-8 border-b border-gray-50 pb-4">
-        <h2 class="text-3xl font-light">Global Leaderboard</h2>
+    <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100">
+      <div class="flex items-center justify-between mb-6 md:mb-8 border-b border-gray-50 pb-4">
+        <h2 class="text-2xl md:text-3xl font-light">Leaderboard</h2>
         <div class="text-right">
-          <div class="text-[10px] uppercase tracking-widest text-gray-400">Metric</div>
-          <div class="text-sm font-bold gold-text uppercase">Aggregate Acc</div>
+          <div class="text-[9px] uppercase tracking-widest text-gray-400">Metric</div>
+          <div class="text-[11px] md:text-sm font-bold gold-text uppercase">Normalized Score</div>
         </div>
       </div>
-      <div id="leaderboardList" class="space-y-4"></div>
+      <div id="leaderboardList" class="space-y-3 md:space-y-4"></div>
     </div>
 
-    <div id="authModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
-      <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border border-gray-100">
+    <div id="authModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6">
+      <div class="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 md:p-8 max-w-md w-full border border-gray-100 pb-10 sm:pb-8">
         <div class="flex justify-between items-center mb-6">
-          <h2 id="modalTitle" class="text-3xl font-light">Login</h2>
-          <button onclick="closeAuthModal()" class="text-gray-400 hover:text-black text-2xl">&times;</button>
+          <h2 id="modalTitle" class="text-2xl md:text-3xl font-light">Login</h2>
+          <button onclick="closeAuthModal()" class="text-gray-400 hover:text-black text-2xl px-2">&times;</button>
         </div>
         <div class="space-y-4">
           <div id="usernameWrapper" class="hidden">
-            <input type="text" id="authUsername" placeholder="Architect Name (Username)" 
-                   class="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#D4AF37] outline-none mb-2">
+            <input type="text" id="authUsername" placeholder="Architect Name" 
+                   class="w-full p-3 md:p-4 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#D4AF37] outline-none mb-2">
           </div>
+          <input type="email" id="authEmail" placeholder="Email" class="w-full p-3 md:p-4 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#D4AF37] outline-none">
+          <input type="password" id="authPassword" placeholder="Password" class="w-full p-3 md:p-4 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#D4AF37] outline-none">
           
-          <input type="email" id="authEmail" placeholder="Email" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#D4AF37] outline-none">
-          <input type="password" id="authPassword" placeholder="Password" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#D4AF37] outline-none">
-          
-          <button id="mainAuthBtn" onclick="submitAuth()" class="w-full gold-bg text-white py-4 rounded-xl font-bold shadow-lg hover:brightness-110 transition-all">Continue</button>
+          <button id="mainAuthBtn" onclick="submitAuth()" class="w-full gold-bg text-white py-3 md:py-4 rounded-xl font-bold shadow-lg hover:brightness-110 transition-all text-sm md:text-base">Continue</button>
           
           <div class="relative my-4">
             <div class="absolute inset-0 flex items-center"><span class="w-full border-t border-gray-100"></span></div>
             <div class="relative flex justify-center text-[10px] uppercase tracking-widest"><span class="bg-white px-2 text-gray-400 font-sans">Or</span></div>
           </div>
 
-          <button onclick="signInWithGoogle()" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 py-3 rounded-xl font-semibold shadow-sm hover:bg-gray-50 transition-all text-sm font-sans">
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5">
+          <button onclick="signInWithGoogle()" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 py-3 rounded-xl font-semibold shadow-sm hover:bg-gray-50 transition-all text-xs md:text-sm font-sans">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-4 h-4 md:w-5 md:h-5">
             Continue with Google
           </button>
           
-          <p class="text-center text-sm text-gray-400 mt-4">
+          <p class="text-center text-xs md:text-sm text-gray-400 mt-4">
             <span id="toggleText">Don't have an account?</span> 
             <button onclick="toggleAuthMode()" id="toggleBtn" class="gold-text font-bold ml-1">Sign Up</button>
           </p>
@@ -254,46 +252,65 @@
         list.innerHTML = "";
 
         const createCard = (m, rank) => {
-          const isCurrent = lastGeneratedModel && m.id === lastGeneratedModel.id;
-          const isBaseline = m.user_prompt === 'benchmark' || m.is_baseline === true;
-          const card = document.createElement("div");
-          
-          let bgColor = "bg-gray-50 border-gray-100 hover:border-gray-300";
-          let textColor = "text-gray-300";
-          let scoreColor = "gold-text";
+            const isCurrent = lastGeneratedModel && m.id === lastGeneratedModel.id;
+            const isBaseline = m.user_prompt === 'benchmark' || m.is_baseline === true;
+            const card = document.createElement("div");
+            
+            let bgColor = "bg-gray-50 border-gray-100 hover:border-gray-300";
+            let textColor = "text-gray-300";
+            let scoreColor = "gold-text";
 
-          if (isBaseline) {
-            bgColor = "bg-blue-50 border-blue-200 shadow-sm";
-            textColor = "text-blue-400";
-            scoreColor = "text-blue-600";
-          } else if (isCurrent) {
-            bgColor = "bg-yellow-50 border-[#D4AF37] shadow-md ring-1 ring-[#D4AF37]";
-            textColor = "gold-text";
-          }
+            if (isBaseline) {
+                bgColor = "bg-blue-50 border-blue-200 shadow-sm";
+                textColor = "text-blue-400";
+                scoreColor = "text-blue-600";
+            } else if (isCurrent) {
+                bgColor = "bg-yellow-50 border-[#D4AF37] shadow-md ring-1 ring-[#D4AF37]";
+                textColor = "gold-text";
+            }
 
-          card.className = `p-5 rounded-xl border transition-all cursor-pointer mb-4 ${bgColor}`;
-          card.innerHTML = `
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-5">
-                <span class="text-2xl font-bold ${textColor} font-sans w-12">${rank}</span>
-                <div>
-                  <div class="font-semibold text-lg">${m.name}</div>
-                  <div class="text-[10px] uppercase tracking-[0.15em] text-gray-400 font-bold">
-                    Architect: ${m.creator_name || (isBaseline ? 'Scikit-Learn' : 'Unknown')}
-                  </div>
+            card.className = `w-full box-border p-4 md:p-5 rounded-xl border transition-all cursor-pointer mb-3 md:mb-4 ${bgColor}`;
+            
+            card.innerHTML = `
+            <div class="flex items-center justify-between w-full gap-3 overflow-hidden min-w-0">
+                <div class="flex items-center gap-3 md:gap-5 min-w-0 flex-1">
+                    <span class="text-lg md:text-2xl font-bold ${textColor} font-sans w-7 md:w-12 flex-shrink-0">
+                        ${rank}
+                    </span>
+                    
+                    <div class="min-w-0 flex-1">
+                        <div class="font-semibold text-sm md:text-lg leading-tight line-clamp-2" title="${m.name}">
+                            ${m.name}
+                        </div>
+                        <div class="text-[9px] md:text-[10px] uppercase tracking-[0.1em] text-gray-400 font-bold truncate opacity-80">
+                            ${m.creator_name || 'System'}
                 </div>
+                </div>
+              </div>
+              </div>
               </div>
               <div class="text-right">
                 <div class="text-2xl font-bold ${scoreColor}">${(m.display_acc * 100).toFixed(2)}%</div>
-              </div>
+                    </div>
+              <div class="text-right">
+                <div class="text-2xl font-bold ${scoreColor}">${(m.display_acc * 100).toFixed(2)}%</div>
+                </div>
+
+                <div class="text-right ml-auto pl-2 flex-shrink min-w-0">
+                    <div class="text-lg md:text-2xl font-bold ${scoreColor} leading-none whitespace-nowrap">
+                        ${(m.display_acc * 100).toFixed(2)}
+                    </div>
+                    <div class="text-[8px] md:text-[9px] text-gray-400 uppercase font-bold tracking-tighter mt-1 whitespace-nowrap">
+                        Points
+                    </div>
+                </div>
+
             </div>`;
           return card;
         };
-
         data.ranked_list.forEach((m, idx) => list.appendChild(createCard(m, `#${idx + 1}`)));
       } catch (e) { console.error(e); }
     }
-    let detailsVisible = false;
 
     async function toggleDetails() {
         const grid = document.getElementById("detailsGrid");
