@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Infinity | OMEGA Arena</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600&display=swap" rel="stylesheet">
-  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <style>
     body { font-family: 'Crimson Pro', serif; background-color: #F8F7F2; }
@@ -17,41 +17,33 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
     .loading-pulse { animation: pulse 1.5s infinite; }
     @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
-    .transition-transform { transition: transform 0.3s ease; }
   </style>
 </head>
 
 <body class="text-gray-800 pb-20">
-    <nav class="bg-white/80 backdrop-blur-md border-b border-gray-100 w-full fixed top-0 z-50">
-        <div class="max-w-5xl mx-auto px-6 py-6 flex justify-between items-center">
-          <div class="text-2xl tracking-[0.3em] font-light gold-text font-sans">INFINITY</div>
-          <div class="space-x-8 text-[12px] uppercase tracking-[0.25em] font-bold text-gray-400">
-            <a href="/docs" class="hover:text-black transition-colors flex items-center gap-2">
-              <span>API Documentation</span>
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-          </div>
-        </div>
-      </nav>
+  <nav class="bg-white/80 backdrop-blur-md border-b border-gray-100 w-full fixed top-0 z-50">
+    <div class="max-w-5xl mx-auto px-6 py-6 flex justify-between items-center">
+      <div class="text-2xl tracking-[0.3em] font-light gold-text font-sans">INFINITY</div>
+      <div class="flex items-center space-x-8 text-[12px] uppercase tracking-[0.25em] font-bold text-gray-400">
+        <a href="/docs" class="hover:text-black transition-colors">API Docs</a>
+        <button id="authBtn" onclick="handleAuth()" class="hover:text-black transition-colors border-l pl-8 border-gray-100">Login</button>
+      </div>
+    </div>
+  </nav>
 
   <div class="h-32"></div>
 
   <main class="max-w-4xl mx-auto px-6">
     <div class="text-center mb-10">
-      <h1 class="text-5xl mb-4 font-light">Make your own ML Model.</h1>
-      <p class="text-gray-400 italic text-lg">Every generation is benchmarked against the global leaderboard.</p>
+      <h1 class="text-5xl mb-4 font-light text-gray-900">Make your own ML Model.</h1>
+      <p class="text-gray-400 italic text-lg text-balance">Every generation is benchmarked against the global leaderboard.</p>
     </div>
 
     <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 mb-8">
-      <textarea id="prompt" rows="3"
-        class="w-full text-2xl font-light border-none focus:ring-0 placeholder-gray-200 resize-none"
-        placeholder="Describe a novel architecture..."></textarea>
+      <textarea id="prompt" rows="3" class="w-full text-2xl font-light border-none focus:ring-0 placeholder-gray-200 resize-none" placeholder="Describe a novel architecture..."></textarea>
       <div class="mt-6 pt-6 border-t border-gray-50 flex justify-between items-center">
-        <div id="statusLabel" class="text-sm text-gray-400 font-sans">Ready for synthesis</div>
-        <button onclick="generateModel()" id="btn"
-          class="gold-bg text-white px-10 py-3 rounded-full hover:scale-105 transition-all shadow-lg font-semibold tracking-wide">
+        <div id="statusLabel" class="text-sm text-gray-400 font-sans tracking-wide">Ready for synthesis</div>
+        <button onclick="generateModel()" id="btn" class="gold-bg text-white px-10 py-3 rounded-full hover:scale-105 transition-all shadow-lg font-semibold tracking-wide active:scale-95">
           Generate & Rank
         </button>
       </div>
@@ -79,178 +71,198 @@
       <div class="flex items-center justify-between mb-8 border-b border-gray-50 pb-4">
         <h2 class="text-3xl font-light">Global Leaderboard</h2>
         <div class="text-right">
-            <div class="text-[10px] uppercase tracking-widest text-gray-400">Metric</div>
-            <div class="text-sm font-bold gold-text uppercase">Min-Max Norm</div>
+          <div class="text-[10px] uppercase tracking-widest text-gray-400">Metric</div>
+          <div class="text-sm font-bold gold-text uppercase">Aggregate Acc</div>
         </div>
       </div>
       <div id="leaderboardList" class="space-y-4"></div>
     </div>
+
+    <div id="authModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+      <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border border-gray-100">
+        <div class="flex justify-between items-center mb-6">
+          <h2 id="modalTitle" class="text-3xl font-light">Login</h2>
+          <button onclick="closeAuthModal()" class="text-gray-400 hover:text-black text-2xl">&times;</button>
+        </div>
+        <div class="space-y-4">
+          <div id="usernameWrapper" class="hidden">
+            <input type="text" id="authUsername" placeholder="Architect Name (Username)" 
+                   class="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#D4AF37] outline-none mb-2">
+          </div>
+          
+          <input type="email" id="authEmail" placeholder="Email" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#D4AF37] outline-none">
+          <input type="password" id="authPassword" placeholder="Password" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#D4AF37] outline-none">
+          
+          <button id="mainAuthBtn" onclick="submitAuth()" class="w-full gold-bg text-white py-4 rounded-xl font-bold shadow-lg hover:brightness-110 transition-all">Continue</button>
+          
+          <p class="text-center text-sm text-gray-400 mt-4">
+            <span id="toggleText">Don't have an account?</span> 
+            <button onclick="toggleAuthMode()" id="toggleBtn" class="gold-text font-bold ml-1">Sign Up</button>
+          </p>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script>
+    let supabaseClient = null; 
+    let currentUser = null;
     let lastGeneratedModel = null;
-    let detailsVisible = false;
-    let summariesCache = {}; 
+    let isSignUpMode = false;
 
-    async function toggleDetails() {
-      const grid = document.getElementById("detailsGrid");
-      const icon = document.getElementById("toggleIcon");
-      detailsVisible = !detailsVisible;
-      if (detailsVisible) {
-        grid.classList.remove("hidden");
-        icon.style.transform = "rotate(180deg)";
-        await refreshDatasetStats();
+    async function initSupabase() {
+        try {
+            const res = await fetch('/config');
+            const config = await res.json();
+            
+            supabaseClient = supabase.createClient(config.supabase_url, config.supabase_anon_key);
+            
+            await checkUser();
+            await refreshLeaderboard();
+        } catch (err) {
+            console.error("Initialization failed. Check if /config endpoint is working.", err);
+        }
+    }
+
+    async function checkUser() {
+      if (!supabaseClient) return;
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      currentUser = user;
+      const authBtn = document.getElementById("authBtn");
+      if (authBtn) authBtn.innerText = user ? "Logout" : "Login";
+    }
+
+    function openAuthModal() { document.getElementById('authModal').classList.remove('hidden'); }
+    function closeAuthModal() { document.getElementById('authModal').classList.add('hidden'); }
+
+    function toggleAuthMode() {
+      isSignUpMode = !isSignUpMode;
+      const userWrapper = document.getElementById('usernameWrapper');
+      document.getElementById('modalTitle').innerText = isSignUpMode ? "Sign Up" : "Login";
+      document.getElementById('mainAuthBtn').innerText = isSignUpMode ? "Create Account" : "Continue";
+      document.getElementById('toggleText').innerText = isSignUpMode ? "Already have an account?" : "Don't have an account?";
+      document.getElementById('toggleBtn').innerText = isSignUpMode ? "Login" : "Sign Up";
+      isSignUpMode ? userWrapper.classList.remove('hidden') : userWrapper.classList.add('hidden');
+    }
+
+    async function handleAuth() {
+      if (currentUser) {
+        await supabaseClient.auth.signOut();
+        window.location.reload();
       } else {
-        grid.classList.add("hidden");
-        icon.style.transform = "rotate(0deg)";
+        openAuthModal();
       }
     }
 
-    async function refreshDatasetStats() {
-      const grid = document.getElementById("detailsGrid");
-      try {
-        const res = await fetch("/dataset-stats");
-        const data = await res.json();
-        grid.innerHTML = "";
-        for (const [name, bounds] of Object.entries(data.stats)) {
-          const card = document.createElement("div");
-          card.className = "p-4 rounded-xl bg-gray-50 border border-gray-100 shadow-sm";
-          card.innerHTML = `
-            <div class="text-sm uppercase tracking-tight text-gray-700 font-bold mb-3 truncate border-b border-gray-200 pb-1">${name}</div>
-            <div class="flex justify-between items-center text-[11px] font-semibold">
-              <div class="text-red-500"><span class="opacity-50 text-[9px] mr-1">MIN</span>${(bounds.min * 100).toFixed(1)}%</div>
-              <div class="text-green-600"><span class="opacity-50 text-[9px] mr-1">MAX</span>${(bounds.max * 100).toFixed(1)}%</div>
-            </div>
-            <div class="w-full bg-gray-200 h-1.5 mt-3 rounded-full overflow-hidden">
-              <div class="bg-green-500 h-full transition-all duration-500" style="width: ${bounds.max * 100}%"></div>
-            </div>`;
-          grid.appendChild(card);
-        }
-      } catch (e) { console.error(e); }
+    async function submitAuth() {
+      const email = document.getElementById('authEmail').value;
+      const password = document.getElementById('authPassword').value;
+      const username = document.getElementById('authUsername').value;
+      
+      if (isSignUpMode) {
+        const { data, error } = await supabaseClient.auth.signUp({
+          email, password, options: { data: { display_name: username } }
+        });
+        if (error) alert(error.message);
+        else alert("Verification email sent!");
+      } else {
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) alert(error.message);
+        else { closeAuthModal(); window.location.reload(); }
+      }
     }
 
     async function generateModel() {
+      if (!currentUser) return openAuthModal();
+      
       const prompt = document.getElementById('prompt').value;
       const btn = document.getElementById('btn');
       const status = document.getElementById('statusLabel');
-      if (!prompt) return alert("Enter description.");
+      
+      if (!prompt.trim()) return alert("Enter a description.");
+
       btn.disabled = true;
       btn.classList.add('opacity-50');
-      status.innerText = "Synthesizing...";
+      status.innerText = "Synthesizing & Benchmarking...";
+
       try {
+        const finalDisplayName = currentUser.user_metadata?.display_name || currentUser.email.split('@')[0];
+
         const response = await fetch('/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ description: prompt })
+          body: JSON.stringify({ 
+            description: prompt,
+            user_id: currentUser.id,
+            creator_name: finalDisplayName
+          })
         });
+
         const data = await response.json();
         if (response.ok) {
-          lastGeneratedModel = data;
-          const vals = Object.values(data.metrics);
-          lastGeneratedModel.display_acc = vals.reduce((a,b)=>a+b,0)/vals.length;
-          status.innerText = "Ranked successfully.";
-          await refreshLeaderboard();
+        lastGeneratedModel = data;
+        
+        // FORCE the name into the local object so it shows up right away
+        const metadataName = currentUser.user_metadata?.display_name;
+        const emailPrefix = currentUser.email.split('@')[0];
+        lastGeneratedModel.creator_name = metadataName || emailPrefix;
+
+        status.innerText = "Ranked successfully.";
+        await refreshLeaderboard();
         } else { throw new Error(data.detail); }
       } catch (err) { alert(err.message); status.innerText = "Error."; }
       finally { btn.disabled = false; btn.classList.remove('opacity-50'); }
     }
 
-    async function toggleSummary(modelId, rankText) {
-        if (modelId.startsWith('sklearn-')) return;
-        const container = document.getElementById(`content-${modelId}`);
-        const isShowingSummary = container.getAttribute('data-state') === 'summary';
-
-        if (isShowingSummary) {
-            await refreshLeaderboard();
-            return;
-        }
-
-        container.setAttribute('data-state', 'summary');
-        container.innerHTML = `<div class="text-sm gold-text loading-pulse italic">Interpreting mathematical intuition...</div>`;
-
-        try {
-            let summary = summariesCache[modelId];
-            if (!summary) {
-                const res = await fetch(`/summarize/${modelId}`);
-                const data = await res.json();
-                summary = data.summary;
-                summariesCache[modelId] = summary;
-            }
-            container.innerHTML = `<div class="summary-text text-sm text-gray-600 py-1 pr-4 border-l-2 border-[#D4AF37] pl-4">${summary}</div>`;
-        } catch (e) {
-            container.innerHTML = `<div class="text-xs text-red-400">Analysis unavailable.</div>`;
-        }
-    }
-
     async function refreshLeaderboard() {
-    const list = document.getElementById("leaderboardList");
-    try {
+      const list = document.getElementById("leaderboardList");
+      try {
         const res = await fetch("/leaderboard");
         const data = await res.json();
-        
-        const rankedList = data.ranked_list || [];
         list.innerHTML = "";
 
         const createCard = (m, rank) => {
-        const isCurrent = lastGeneratedModel && m.id === lastGeneratedModel.id;
-        const isBaseline = m.is_baseline;
-        const card = document.createElement("div");
-        
-        let bgColor = "bg-gray-50 border-gray-100";
-        let textColor = "text-gray-300";
-        let cursor = "cursor-pointer hover:border-gray-300";
-        let scoreColor = "gold-text";
+          const isCurrent = lastGeneratedModel && m.id === lastGeneratedModel.id;
+          const isBaseline = m.is_baseline;
+          const card = document.createElement("div");
+          
+          let bgColor = "bg-gray-50 border-gray-100 hover:border-gray-300";
+          let textColor = "text-gray-300";
+          let scoreColor = "gold-text";
 
-        if (isBaseline) {
+          if (isBaseline) {
             bgColor = "bg-blue-50 border-blue-200 shadow-sm";
             textColor = "text-blue-400";
             scoreColor = "text-blue-600";
-            cursor = "cursor-default";
-        } else if (isCurrent) {
+          } else if (isCurrent) {
             bgColor = "bg-yellow-50 border-[#D4AF37] shadow-md ring-1 ring-[#D4AF37]";
             textColor = "gold-text";
-        }
+          }
 
-        card.className = `p-5 rounded-xl border transition-all ${bgColor} ${cursor} mb-4`;
-        if (!isBaseline) card.onclick = () => toggleSummary(m.id, rank);
-
-        card.innerHTML = `
+          card.className = `p-5 rounded-xl border transition-all cursor-pointer mb-4 ${bgColor}`;
+          card.innerHTML = `
             <div class="flex items-center justify-between">
-            <div id="content-${m.id}" class="flex items-center gap-5 w-full">
+              <div class="flex items-center gap-5">
                 <span class="text-2xl font-bold ${textColor} font-sans w-12">${rank}</span>
                 <div>
-                <div class="font-semibold text-lg">
-                    ${m.name} 
-                    ${isCurrent ? '<span class="ml-2 text-[10px] gold-bg text-white px-2 py-0.5 rounded-full uppercase">Current Result</span>' : ''}
-                    ${isBaseline ? '<span class="ml-2 text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full uppercase">Baseline</span>' : ''}
+                  <div class="font-semibold text-lg">${m.name}</div>
+                  <div class="text-[10px] uppercase tracking-[0.15em] text-gray-400 font-bold">
+                    Architect: ${m.creator_name || (isBaseline ? 'Scikit-Learn' : 'Unknown')}
+                  </div>
                 </div>
-                <div class="text-xs text-gray-400 font-sans tracking-tight">${m.id.substring(0,8)}...</div>
-                </div>
-            </div>
-            <div class="text-right ml-4">
+              </div>
+              <div class="text-right">
                 <div class="text-2xl font-bold ${scoreColor}">${(m.display_acc * 100).toFixed(2)}%</div>
-            </div>
+              </div>
             </div>`;
-        return card;
+          return card;
         };
 
-        rankedList.forEach((m, idx) => {
-        list.appendChild(createCard(m, `#${idx + 1}`));
-        });
-
-        const isInList = lastGeneratedModel && rankedList.some(m => m.id === lastGeneratedModel.id);
-        if (lastGeneratedModel && !isInList) {
-        const spacer = document.createElement("div");
-        spacer.className = "flex justify-center py-4 opacity-20";
-        spacer.innerHTML = `<div class="h-1 w-1 bg-black rounded-full mx-1"></div><div class="h-1 w-1 bg-black rounded-full mx-1"></div>`;
-        list.appendChild(spacer);
-        list.appendChild(createCard(lastGeneratedModel, "—"));
-        }
-
+        data.ranked_list.forEach((m, idx) => list.appendChild(createCard(m, `#${idx + 1}`)));
       } catch (e) { console.error(e); }
     }
 
-    refreshLeaderboard();
+    initSupabase();
   </script>
 </body>
 </html>

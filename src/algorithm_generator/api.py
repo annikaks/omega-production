@@ -4,6 +4,7 @@ import json
 import time
 import importlib.util
 import traceback
+import hashlib
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 from typing import Optional, Dict, Any, List
@@ -13,21 +14,29 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from dotenv import load_dotenv
+from supabase import create_client, Client
 
 import anthropic
 
-# Assuming these are your local files
 from generate import AlgoGen
 from evaluate import BenchmarkSuite, eval_one_benchmark_task, BenchmarkTask
 from metaprompt import LOG_FILE, GENERATION_DIRECTORY_PATH
 from describe import ModelAnalyzer 
 from storage.display_benchmarks import SKLEARN_BENCHMARKS
 
+load_dotenv()
+
+URL = os.getenv("SUPABASE_URL")
+KEY = os.getenv("SUPABASE_KEY")
+if not URL or not KEY:
+    raise RuntimeError("Supabase credentials not set in .env")
+supabase: Client = create_client(URL, KEY)
+
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 STORAGE_DIR = BASE_DIR / "storage"
 BOUNDS_PATH = STORAGE_DIR / "bounds.json"
-MODELS_DATA_PATH = STORAGE_DIR / "all_models.json"
 STORAGE_DIR.mkdir(exist_ok=True)
 
 def _read_json(path: Path, default: Any):
@@ -42,20 +51,6 @@ def _write_json_atomic(path: Path, data: Any):
     tmp.write_text(json.dumps(data, indent=2))
     tmp.replace(path)
 
-_LOCK_PATH = STORAGE_DIR / ".lock"
-def _acquire_lock(timeout_s: float = 3.0):
-    t0 = time.time()
-    while True:
-        try:
-            fd = os.open(str(_LOCK_PATH), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            os.close(fd)
-            return
-        except FileExistsError:
-            if time.time() - t0 > timeout_s: raise RuntimeError("Lock timeout")
-            time.sleep(0.05)
-def _release_lock():
-    _LOCK_PATH.unlink(missing_ok=True)
-
 algo_gen = None
 suite = None
 analyzer = None 
@@ -65,9 +60,6 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 @app.on_event("startup")
 def startup_event():
     global algo_gen, suite, analyzer
-    if not MODELS_DATA_PATH.exists():
-        _write_json_atomic(MODELS_DATA_PATH, {"models": []})
-
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key: raise RuntimeError("ANTHROPIC_API_KEY not set")
     
@@ -76,9 +68,17 @@ def startup_event():
     suite = BenchmarkSuite()
     analyzer = ModelAnalyzer(anthropic_client=client) 
 
+@app.get("/config")
+def get_config():
+    return {
+        "supabase_url": os.getenv("SUPABASE_URL"),
+        "supabase_anon_key": os.getenv("SUPABASE_ANON_KEY") 
+    }
 
 class SynthesisRequest(BaseModel):
     description: str
+    user_id: str
+    creator_name: str
 
 def eval_single_ds(args):
     dataset_name, model_content, class_name, X_train, X_test, y_train, y_test = args
@@ -92,7 +92,7 @@ def eval_single_ds(args):
     m_name, d_name, cell, err, stats = eval_one_benchmark_task(task)
     return m_name, d_name, cell, stats
 
-def update_bounds_and_rankings(new_metrics: Dict[str, float]):
+def update_bounds_and_calculate_score(new_metrics: Dict[str, float]):
     bounds = _read_json(BOUNDS_PATH, {})
     bounds_changed = False
     for ds, val in new_metrics.items():
@@ -102,17 +102,17 @@ def update_bounds_and_rankings(new_metrics: Dict[str, float]):
         else:
             if val < bounds[ds]["min"]: bounds[ds]["min"] = val; bounds_changed = True
             if val > bounds[ds]["max"]: bounds[ds]["max"] = val; bounds_changed = True
-    if bounds_changed: _write_json_atomic(BOUNDS_PATH, bounds)
     
-    data = _read_json(MODELS_DATA_PATH, {"models": []})
-    for m in data["models"]:
-        rel_scores = []
-        for ds, val in m["metrics"].items():
-            mn, mx = bounds[ds]["min"], bounds[ds]["max"]
-            denom = mx - mn
-            rel_scores.append((val - mn) / denom if denom > 0 else 1.0)
-        m["total_score"] = sum(rel_scores) / len(rel_scores) if rel_scores else 0
-    _write_json_atomic(MODELS_DATA_PATH, data)
+    if bounds_changed: 
+        _write_json_atomic(BOUNDS_PATH, bounds)
+    
+    rel_scores = []
+    for ds, val in new_metrics.items():
+        mn, mx = bounds[ds]["min"], bounds[ds]["max"]
+        denom = mx - mn
+        rel_scores.append((val - mn) / denom if denom > 0 else 1.0)
+    
+    return sum(rel_scores) / len(rel_scores) if rel_scores else 0
 
 @app.get("/")
 async def read_index():
@@ -121,8 +121,9 @@ async def read_index():
 @app.post("/generate")
 async def handle_synthesis(req: SynthesisRequest):
     try:
+        start_time = time.time()
         gen_result = algo_gen.parallel_genML([req.description])
-        fname, cname, _ = gen_result[0]
+        fname, cname, strategy = gen_result[0]
         with open(os.path.join(GENERATION_DIRECTORY_PATH, fname), "r") as f:
             code_string = f.read()
 
@@ -131,84 +132,101 @@ async def handle_synthesis(req: SynthesisRequest):
             results_list = list(executor.map(eval_single_ds, tasks))
 
         metrics_out = {d_n: float(c.get("Accuracy", 0.0)) for _, d_n, c, _ in results_list}
-        new_id = str(uuid.uuid4())
-        model_entry = {"id": new_id, "name": cname, "filename": fname, "description": req.description, "metrics": metrics_out, "timestamp": time.time()
+        
+        total_min_max = update_bounds_and_calculate_score(metrics_out)
+        eval_time = time.time() - start_time
+
+        # 4. Save to Database
+        db_payload = {
+            "user_id": req.user_id,
+            "creator_name": req.creator_name,
+            "user_prompt": req.description,
+            "strategy_label": strategy or "Parallel Synthesis",
+            "class_name": cname,
+            "file_name": fname,
+            "algorithm_code": code_string,
+            "code_hash": hashlib.sha256(code_string.strip().encode()).hexdigest(),
+            "eval_time_seconds": eval_time,
+            "aggregate_acc": sum(metrics_out.values()) / len(metrics_out),
+            "min_max_score": total_min_max,
+            # Map metrics to columns
+            "iris_acc": metrics_out.get("Iris"),
+            "wine_acc": metrics_out.get("Wine"),
+            "breast_cancer_acc": metrics_out.get("Breast Cancer"),
+            "digits_acc": metrics_out.get("Digits"),
+            "balance_scale_acc": metrics_out.get("Balance Scale"),
+            "blood_transfusion_acc": metrics_out.get("Blood Transfusion"),
+            "haberman_acc": metrics_out.get("Haberman"),
+            "seeds_acc": metrics_out.get("Seeds"),
+            "teaching_assistant_acc": metrics_out.get("Teaching Assistant"),
+            "zoo_acc": metrics_out.get("Zoo"),
+            "planning_relax_acc": metrics_out.get("Planning Relax"),
+            "ionosphere_acc": metrics_out.get("Ionosphere"),
+            "sonar_acc": metrics_out.get("Sonar"),
+            "glass_acc": metrics_out.get("Glass"),
+            "vehicle_acc": metrics_out.get("Vehicle"),
+            "liver_disorders_acc": metrics_out.get("Liver Disorders"),
+            "heart_statlog_acc": metrics_out.get("Heart Statlog"),
+            "pima_diabetes_acc": metrics_out.get("Pima Indians Diabetes"),
+            "australian_acc": metrics_out.get("Australian"),
+            "monks_1_acc": metrics_out.get("Monks-1")
         }
 
-        try:
-            _acquire_lock()
-            data = _read_json(MODELS_DATA_PATH, {"models": []})
-            data["models"].append(model_entry)
-            _write_json_atomic(MODELS_DATA_PATH, data)
-            update_bounds_and_rankings(metrics_out)
-        finally: _release_lock()
-        return {**model_entry, "script": code_string}
+        db_res = supabase.table("algorithms").insert(db_payload).execute()
+        new_id = db_res.data[0]['id']
+
+        return {"id": new_id, "name": cname, "metrics": metrics_out, "display_acc": db_payload["min_max_score"]}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/leaderboard")
 def get_leaderboard():
-    data = _read_json(MODELS_DATA_PATH, {"models": []})
-    user_models = data.get("models", [])
-    for m in user_models:
-        m["is_baseline"] = False
+    res = supabase.table("algorithms") \
+        .select("id, class_name, aggregate_acc, min_max_score, creator_name") \
+        .order("min_max_score", desc=True) \
+        .limit(10).execute()
+    
+    user_models = []
+    for row in res.data:
+        user_models.append({
+            "id": row['id'],
+            "name": row['class_name'],
+            "display_acc": row['min_max_score'],
+            "total_score": row['min_max_score'],
+            "creator_name": row.get('creator_name'),
+            "is_baseline": False
+        })
 
-    all_entries = user_models + SKLEARN_BENCHMARKS
-    
-    for m in all_entries:
-        vals = list(m["metrics"].values())
-        m["display_acc"] = sum(vals) / len(vals) if vals else 0
-        if "total_score" not in m:
-            m["total_score"] = m["display_acc"]
+    baselines = []
+    for b in SKLEARN_BENCHMARKS:
+        vals = list(b["metrics"].values())
+        acc = sum(vals) / len(vals)
+        baselines.append({
+            "id": b["id"],
+            "name": b["name"],
+            "display_acc": acc,
+            "total_score": acc,
+            "is_baseline": True
+        })
 
-    all_entries.sort(key=lambda x: x.get("total_score", 0), reverse=True)
-    
-    top_entries = all_entries[:100]
-    
-    return {
-        "ranked_list": [
-            {
-                "id": m["id"], 
-                "name": m["name"], 
-                "display_acc": m["display_acc"], 
-                "is_baseline": m.get("is_baseline", False),
-                "summary": m.get("summary") if not m.get("is_baseline") else "Scikit-Learn Standard"
-            } for m in top_entries
-        ]
-    }
+    all_entries = sorted(user_models + baselines, key=lambda x: x['total_score'], reverse=True)
+    return {"ranked_list": all_entries}
 
 @app.get("/summarize/{model_id}")
 async def get_summary(model_id: str):
-    global analyzer 
-    if analyzer is None:
-        raise HTTPException(status_code=503, detail="Analyzer not initialized")
-        
     try:
-        _acquire_lock()
-        data = _read_json(MODELS_DATA_PATH, {"models": []})
-        m = next((x for x in data["models"] if x["id"] == model_id), None)
-        if not m: raise HTTPException(status_code=404, detail="Model not found")
-        
-        if "summary" in m and m["summary"]: 
-            return {"summary": m["summary"]}
+        res = supabase.table("algorithms").select("summary, file_name").eq("id", model_id).single().execute()
+        if res.data.get("summary"):
+            return {"summary": res.data["summary"]}
 
-        filename = m.get("filename")
-        if not filename:
-            filename = f"{m['name']}.py"
-
-        summary = analyzer.describe_single(GENERATION_DIRECTORY_PATH, filename)
+        summary = analyzer.describe_single(GENERATION_DIRECTORY_PATH, res.data["file_name"])
+        if " : " in summary: summary = summary.split(" : ", 1)[1]
         
-        if " : " in summary:
-            summary = summary.split(" : ", 1)[1]
-        
-        m["summary"] = summary
-        _write_json_atomic(MODELS_DATA_PATH, data)
+        supabase.table("algorithms").update({"summary": summary}).eq("id", model_id).execute()
         return {"summary": summary}
     except Exception as e:
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-    finally: _release_lock()
 
 @app.get("/dataset-stats")
 def get_dataset_stats():
