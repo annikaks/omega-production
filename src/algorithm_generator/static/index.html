@@ -95,6 +95,16 @@
           
           <button id="mainAuthBtn" onclick="submitAuth()" class="w-full gold-bg text-white py-4 rounded-xl font-bold shadow-lg hover:brightness-110 transition-all">Continue</button>
           
+          <div class="relative my-4">
+            <div class="absolute inset-0 flex items-center"><span class="w-full border-t border-gray-100"></span></div>
+            <div class="relative flex justify-center text-[10px] uppercase tracking-widest"><span class="bg-white px-2 text-gray-400 font-sans">Or</span></div>
+          </div>
+
+          <button onclick="signInWithGoogle()" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 py-3 rounded-xl font-semibold shadow-sm hover:bg-gray-50 transition-all text-sm font-sans">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5">
+            Continue with Google
+          </button>
+          
           <p class="text-center text-sm text-gray-400 mt-4">
             <span id="toggleText">Don't have an account?</span> 
             <button onclick="toggleAuthMode()" id="toggleBtn" class="gold-text font-bold ml-1">Sign Up</button>
@@ -116,6 +126,15 @@
             const config = await res.json();
             
             supabaseClient = supabase.createClient(config.supabase_url, config.supabase_anon_key);
+            
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                if (session) {
+                    currentUser = session.user;
+                    checkUser();
+                    closeAuthModal(); 
+                    refreshLeaderboard();
+                }
+            });
             
             await checkUser();
             await refreshLeaderboard();
@@ -170,6 +189,19 @@
         if (error) alert(error.message);
         else { closeAuthModal(); window.location.reload(); }
       }
+    }
+
+    async function signInWithGoogle() {
+      if (!supabaseClient) return alert("Supabase not initialized");
+      
+      const { data, error } = await supabaseClient.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin 
+        }
+      });
+      
+      if (error) alert("Error: " + error.message);
     }
 
     async function generateModel() {
