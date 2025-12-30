@@ -1,82 +1,41 @@
-{
-  "Iris": {
-    "min": 0.6,
-    "max": 0.9666666666666667
-  },
-  "Wine": {
-    "min": 0.3888888888888889,
-    "max": 1.0
-  },
-  "Breast Cancer": {
-    "min": 0.631578947368421,
-    "max": 0.9649122807017544
-  },
-  "Digits": {
-    "min": 0.48333333333333334,
-    "max": 0.9888888888888889
-  },
-  "Balance Scale": {
-    "min": 0.55,
-    "max": 0.95
-  },
-  "Blood Transfusion": {
-    "min": 0.6266666666666667,
-    "max": 0.8
-  },
-  "Haberman": {
-    "min": 0.5967741935483871,
-    "max": 0.7419354838709677
-  },
-  "Seeds": {
-    "min": 0.6904761904761905,
-    "max": 0.9047619047619048
-  },
-  "Teaching Assistant": {
-    "min": 0.22580645161290322,
-    "max": 0.6451612903225806
-  },
-  "Zoo": {
-    "min": 0.38095238095238093,
-    "max": 0.9047619047619048
-  },
-  "Planning Relax": {
-    "min": 0.4864864864864865,
-    "max": 0.7567567567567568
-  },
-  "Ionosphere": {
-    "min": 0.647887323943662,
-    "max": 0.9577464788732394
-  },
-  "Sonar": {
-    "min": 0.5238095238095238,
-    "max": 0.8809523809523809
-  },
-  "Glass": {
-    "min": 0.3488372093023256,
-    "max": 0.8604651162790697
-  },
-  "Vehicle": {
-    "min": 0.35294117647058826,
-    "max": 0.8470588235294118
-  },
-  "Liver Disorders": {
-    "min": 0.2465753424657534,
-    "max": 0.9178082191780822
-  },
-  "Heart Statlog": {
-    "min": 0.5555555555555556,
-    "max": 0.8518518518518519
-  },
-  "Pima Indians Diabetes": {
-    "min": 0.6233766233766234,
-    "max": 0.7987012987012987
-  },
-  "Australian": {
-    "min": 0.5114503816793893,
-    "max": 0.950381679389313
-  },
-  "Monks-1": {
-    "min": 0.625,
-    "max": 1.0
-  }
-}
+
+{"Zoo":
+  {"max":0.9524,"min":0},
+"Iris":
+  {"max":1,"min":0},
+"Wine":
+  {"max":1,"min":0},
+"Glass":
+  {"max":0.8837,"min":0},
+"Seeds":
+  {"max":0.9524,"min":0},
+"Sonar":
+  {"max":0.9048,"min":0},
+"Digits":
+  {"max":0.9861,"min":0},
+"Monks-1":
+  {"max":1,"min":0},
+"Vehicle":
+  {"max":0.8529,"min":0},
+"Haberman":
+  {"max":0.7419,"min":0},
+"Australian":
+  {"max":0.958,"min":0},
+"Ionosphere":
+  {"max":0.9859,"min":0},
+"Balance Scale":
+  {"max":0.95,"min":0},
+"Breast Cancer":
+  {"max":0.9737,"min":0},
+"Heart Statlog":
+  {"max":0.8704,"min":0},
+"Planning Relax":
+  {"max":0.7568,"min":0},
+"Liver Disorders":
+  {"max":0.9203,"min":0},
+"Blood Transfusion":
+  {"max":0.8333,"min":0},
+"Teaching Assistant":
+  {"max":0.7419,"min":0},
+"Pima Indians Diabetes":
+  {"max":0.7922,"min":0}}
