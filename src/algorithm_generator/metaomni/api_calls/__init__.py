@@ -8,3 +8,4 @@ from metaomni.api_calls.gaussian_naive_bayes import *
 from metaomni.api_calls.logistic_regression_classifier import *
 from metaomni.api_calls.manhattan_weighted_knn_classifier import *
 from metaomni.api_calls.two_layer_neural_net_classifier import *
+from metaomni.api_calls.mlp_classifier_5layer import *
