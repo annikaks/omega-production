@@ -14,5 +14,5 @@ Develop a simple Decision Tree classifier with a maximum depth of 3. The tree sh
 Create a Logistic Regression model from scratch. It must use a standard Sigmoid activation for binary tasks or Softmax for multi-class tasks. Implement a basic batch gradient descent optimizer with a fixed learning rate of 0.01 and a maximum of 100 iterations.,LogisticRegressionClassifier,SUCCESS,0,
 Synthesize a K-Nearest Neighbors classifier that uses the Manhattan distance metric instead of Euclidean. Implement a simple weighting mechanism where closer neighbors have a higher influence on the classification vote using an inverse-distance power of 2.,ManhattanWeightedKNNClassifier,SUCCESS,0,
 create a fully connected 2 layer neural network,TwoLayerNeuralNetClassifier,SUCCESS,0,
-"create a simple fully connected 5 layer neural networks
-",MLPClassifier5Layer,SUCCESS,0,
+"Make a 5 layer fully connected nueral network
+",FiveLayerNeuralNetClassifier,SUCCESS,0,
