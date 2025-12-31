@@ -34,7 +34,7 @@
 
   <main class="max-w-4xl mx-auto px-4 md:px-6">
     <div class="text-center mb-8 md:mb-10">
-      <h1 class="text-3xl md:text-5xl mb-3 md:mb-4 font-light text-gray-900 leading-tight">Make your own ML Model.</h1>
+      <h1 id="mainHeader" class="text-3xl md:text-5xl mb-3 md:mb-4 font-light text-gray-900 leading-tight">Make your own ML Model.</h1>
       <p class="text-gray-400 italic text-base md:text-lg text-balance px-4">Every generation is benchmarked against the global leaderboard.</p>
     </div>
 
@@ -194,7 +194,20 @@
       const { data: { user } } = await supabaseClient.auth.getUser();
       currentUser = user;
       const authBtn = document.getElementById("authBtn");
-      if (authBtn) authBtn.innerText = user ? "Logout" : "Login";
+      const mainHeader = document.getElementById("mainHeader");
+      if (user) {
+        if (authBtn) authBtn.innerText = "Logout";
+        const name = user.user_metadata?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email.split('@')[0];
+
+        if (mainHeader) {
+            mainHeader.innerHTML = `Hi <span class="gold-text">${name}</span>, prompt Omega to make your own ML Model.`;
+        }
+      } else {
+        if (authBtn) authBtn.innerText = "Login";
+        if (mainHeader) {
+            mainHeader.innerText = "Please sign in to compete.";
+        }
+      }
     }
 
     function openAuthModal() { document.getElementById('authModal').classList.remove('hidden'); }
