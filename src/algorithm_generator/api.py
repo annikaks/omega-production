@@ -53,7 +53,7 @@ def _write_json_atomic(path: Path, data: Any):
 algo_gen = None
 suite = None
 analyzer = None 
-app = FastAPI(title="OMEGA Arena")
+app = FastAPI(title="OMEGA")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.on_event("startup")

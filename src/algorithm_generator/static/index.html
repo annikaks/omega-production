@@ -8,6 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600&display=swap" rel="stylesheet">
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <link rel="icon" type="image/x-icon" href="static/infinity_icon.png">
   <style>
     body { font-family: 'Crimson Pro', serif; background-color: #F8F7F2; }
     .gold-bg { background-color: #D4AF37; }
@@ -22,7 +23,9 @@
 <body class="text-gray-800 pb-10 md:pb-20">
   <nav class="bg-white/80 backdrop-blur-md border-b border-gray-100 w-full fixed top-0 z-50">
     <div class="max-w-5xl mx-auto px-4 md:px-6 py-4 md:py-6 flex justify-between items-center">
-      <div class="text-xl md:text-2xl tracking-[0.2em] md:tracking-[0.3em] font-light gold-text font-sans">INFINITY</div>
+        <a href="/" class="flex items-center">
+            <img src="/static/infinity_logo.png" alt="INFINITY" class="h-12 md:h-16 w-auto object-contain transition-transform">
+        </a>
       <div class="flex items-center space-x-4 md:space-x-8 text-[10px] md:text-[12px] uppercase tracking-[0.15em] md:tracking-[0.25em] font-bold text-gray-400">
         <a href="/docs" class="hover:text-black transition-colors hidden sm:block">API Docs</a>
         <button id="authBtn" onclick="handleAuth()" class="hover:text-black transition-colors sm:border-l sm:pl-8 border-gray-100 uppercase">Login</button>
@@ -205,7 +208,7 @@
       } else {
         if (authBtn) authBtn.innerText = "Login";
         if (mainHeader) {
-            mainHeader.innerText = "Please sign in to compete.";
+            mainHeader.innerText = "Please login to compete.";
         }
       }
     }
