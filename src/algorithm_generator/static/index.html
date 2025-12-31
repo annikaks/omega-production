@@ -176,20 +176,16 @@
             
             supabaseClient = supabase.createClient(config.supabase_url, config.supabase_anon_key);
             
-            supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            supabaseClient.auth.onAuthStateChange((event, session) => {
                 if (session) {
                     currentUser = session.user;
-                    await checkUser();
-                    if (event === 'SIGNED_IN') {
-                        closeAuthModal();
-                        refreshLeaderboard();
-                    }
-                } else {
-                    currentUser = null;
-                    await checkUser();
+                    checkUser();
+                    closeAuthModal(); 
+                    refreshLeaderboard();
                 }
             });
             
+            await checkUser();
             await refreshLeaderboard();
         } catch (err) {
             console.error("Initialization failed. Check if /config endpoint is working.", err);
