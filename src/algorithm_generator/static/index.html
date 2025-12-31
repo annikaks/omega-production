@@ -117,6 +117,54 @@
     let currentUser = null;
     let lastGeneratedModel = null;
     let isSignUpMode = false;
+    let detailsVisible = false;
+
+    async function toggleDetails() {
+        const grid = document.getElementById("detailsGrid");
+        const icon = document.getElementById("toggleIcon");
+        detailsVisible = !detailsVisible;
+        
+        if (detailsVisible) {
+            grid.classList.remove("hidden");
+            icon.style.transform = "rotate(180deg)";
+            await refreshDatasetStats(); 
+        } else {
+            grid.classList.add("hidden");
+            icon.style.transform = "rotate(0deg)";
+        }
+    }
+
+    async function refreshDatasetStats() {
+        const grid = document.getElementById("detailsGrid");
+        try {
+            const res = await fetch("/dataset-stats");
+            const data = await res.json();
+            grid.innerHTML = ""; 
+            
+            for (const [name, bounds] of Object.entries(data.stats)) {
+                const card = document.createElement("div");
+                card.className = "p-3 md:p-4 rounded-xl bg-gray-50 border border-gray-100 shadow-sm";
+                
+                const maxPct = (bounds.max * 100).toFixed(1);
+                
+                card.innerHTML = `
+                    <div class="text-[9px] md:text-[10px] uppercase tracking-tight text-gray-500 font-bold mb-2 truncate border-b border-gray-200 pb-1">
+                        ${name}
+                    </div>
+                    <div class="flex justify-between items-center text-[10px] md:text-[11px] font-semibold font-sans">
+                        <div class="text-red-400">MIN: ${(bounds.min * 100).toFixed(1)}%</div>
+                        <div class="text-green-600">MAX: ${maxPct}%</div>
+                    </div>
+                    <div class="w-full bg-gray-200 h-1 md:h-1.5 mt-2 rounded-full overflow-hidden">
+                        <div class="bg-green-500 h-full transition-all duration-1000" style="width: ${maxPct}%"></div>
+                    </div>`;
+                grid.appendChild(card);
+            }
+        } catch (e) { 
+            console.error("Error fetching dataset stats:", e);
+            grid.innerHTML = "<p class='text-sm text-red-500'>Failed to load benchmarking details.</p>";
+        }
+    }
 
     async function initSupabase() {
         try {
