@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600&display=swap" rel="stylesheet">
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-  <link rel="icon" type="image/x-icon" href="static/infinity_icon.png">
+  <link rel="icon" type="image/x-icon" href="/static/infinity_icon.png">
   <style>
     body { font-family: 'Crimson Pro', serif; background-color: #F8F7F2; }
     .gold-bg { background-color: #D4AF37; }
@@ -129,16 +129,15 @@
             
             supabaseClient = supabase.createClient(config.supabase_url, config.supabase_anon_key);
             
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            currentUser = session?.user ?? null;
+            await checkUser();
+
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                if (session) {
-                    currentUser = session.user;
-                    await checkUser();
-                    closeAuthModal(); 
-                    refreshLeaderboard();
-                } else {
-                    currentUser = null;
-                    await checkUser();
-                }
+              currentUser = session?.user ?? null;
+              await checkUser();
+              if (currentUser) closeAuthModal();
+              refreshLeaderboard();
             });
             
         } catch (err) {
@@ -175,7 +174,6 @@
         await supabaseClient.auth.signOut();
         currentUser = null;
         await checkUser();
-        localStorage.removeItem('supabase.auth.token');
         refreshLeaderboard();
       } else {
         openAuthModal();
@@ -202,7 +200,7 @@
     async function signInWithGoogle() {
       const { error } = await supabaseClient.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: window.location.origin }
+        options: { redirectTo: `${window.location.origin}/` }
       });
       if (error) alert(error.message);
     }
