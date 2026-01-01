@@ -16,3 +16,5 @@ Synthesize a K-Nearest Neighbors classifier that uses the Manhattan distance met
 create a fully connected 2 layer neural network,TwoLayerNeuralNetClassifier,SUCCESS,0,
 "Make a 5 layer fully connected nueral network
 ",FiveLayerNeuralNetClassifier,SUCCESS,0,
+"Create a model that ensembles log regression, histgradientdescent and random forest.",VotingEnsembleClassifier,SUCCESS,0,
+"Create a model that ensembles log regression, histgradientdescent and random forest and also does feautre dimensionality reduction",EnsembleDimReduceClassifier,SUCCESS,0,
