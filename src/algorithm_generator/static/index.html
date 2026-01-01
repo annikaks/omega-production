@@ -235,7 +235,7 @@
       status.innerText = "Synthesizing & Benchmarking...";
 
       try {
-        const name = currentUser.user_metadata?.display_name || currentUser.email.split('@')[0];
+        const name = currentUser.user_metadata?.display_name || currentUser.user_metadata?.full_name || currentUser.email.split('@')[0];
         const response = await fetch('/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
