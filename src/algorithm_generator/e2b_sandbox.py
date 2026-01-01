@@ -1,6 +1,7 @@
 import json
 import os
-from typing import Any, Dict, Iterable, List, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 from dotenv import load_dotenv
 
@@ -25,10 +26,19 @@ def _load_sandbox_class():
 
 
 def _create_sandbox(Sandbox):
-    api_key = os.getenv("E2B_KEY") or os.getenv("E2B_API_KEY") or os.getenv("E2B_ACCESS_TOKEN")
+    api_key = (
+        os.getenv("E2B_KEY")
+        or os.getenv("E2B_API_KEY")
+        or os.getenv("E2B_ACCESS_TOKEN")
+    )
+    template = os.getenv("E2B_TEMPLATE")
     if hasattr(Sandbox, "create"):
         try:
-            return Sandbox.create(api_key=api_key) if api_key else Sandbox.create()
+            return (
+                Sandbox.create(template=template, api_key=api_key)
+                if api_key
+                else Sandbox.create(template=template)
+            )
         except TypeError:
             return Sandbox.create()
     try:
@@ -64,21 +74,10 @@ def _run_python_in_sandbox(sandbox: Any, code: str) -> Tuple[str, str]:
     raise E2BSandboxError("Unsupported E2B SDK interface.")
 
 
-def _serialize_datasets(
-    datasets: Dict[str, Tuple[Any, Any, Any, Any]]
-) -> List[Dict[str, Any]]:
-    serialized = []
-    for name, (X_train, X_test, y_train, y_test) in datasets.items():
-        serialized.append(
-            {
-                "name": name,
-                "X_train": X_train.tolist(),
-                "X_test": X_test.tolist(),
-                "y_train": y_train.tolist(),
-                "y_test": y_test.tolist(),
-            }
-        )
-    return serialized
+def _write_sandbox_file(sandbox: Any, path: str, content: str) -> None:
+    if not hasattr(sandbox, "files"):
+        raise E2BSandboxError("Sandbox filesystem API not available.")
+    sandbox.files.write(path, content)
 
 
 def _extract_result(stdout: str) -> Dict[str, Any]:
@@ -92,20 +91,25 @@ def _extract_result(stdout: str) -> Dict[str, Any]:
 
 
 def run_e2b_eval(
-    code_string: str, class_name: str, datasets: Dict[str, Tuple[Any, Any, Any, Any]]
+    code_string: str, class_name: str, dataset_names: List[str]
 ) -> Dict[str, float]:
     payload = {
         "code": code_string,
         "class_name": class_name,
-        "datasets": _serialize_datasets(datasets),
+        "dataset_names": dataset_names,
     }
 
     payload_json = json.dumps(payload)
+    data_loader_path = Path(__file__).resolve().parent / "data_loader.py"
+    if not data_loader_path.exists():
+        raise E2BSandboxError("data_loader.py not found for sandbox upload.")
+    data_loader_code = data_loader_path.read_text()
     runner = f"""
 import json
 import sys
 import traceback
 import types
+import importlib.util
 
 try:
     try:
@@ -114,39 +118,42 @@ try:
         from sklearn.base import clone
     except Exception:
         import subprocess
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "numpy", "scikit-learn"])
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "numpy", "scikit-learn", "openml", "pandas"]
+        )
         import numpy as np
         from sklearn.metrics import accuracy_score
         from sklearn.base import clone
 
-    payload = json.loads({payload_json!r})
+    payload = json.loads(open("/tmp/payload.json", "r").read())
     code_string = payload["code"]
     class_name = payload["class_name"]
-    datasets = payload["datasets"]
+    dataset_names = payload["dataset_names"]
 
     module = types.ModuleType("temp_mod")
     exec(code_string, module.__dict__)
     Cls = getattr(module, class_name)
 
+    spec = importlib.util.spec_from_file_location("data_loader", "/tmp/data_loader.py")
+    data_loader = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(data_loader)
+    datasets = data_loader.load_classification_datasets(dataset_names)
+
     metrics = {{}}
     for ds in datasets:
-        name = ds["name"]
         try:
             model = Cls()
             try:
                 model = clone(model)
             except Exception:
                 model = Cls()
-            X_train = np.asarray(ds["X_train"])
-            X_test = np.asarray(ds["X_test"])
-            y_train = np.asarray(ds["y_train"])
-            y_test = np.asarray(ds["y_test"])
+            X_train, X_test, y_train, y_test = datasets[ds]
             model.fit(X_train, y_train)
             preds = model.predict(X_test)
             acc = accuracy_score(y_test, preds)
-            metrics[name] = float(acc)
+            metrics[ds] = float(acc)
         except Exception:
-            metrics[name] = 0.0
+            metrics[ds] = 0.0
 
     print(json.dumps({{"metrics": metrics}}))
 except Exception as exc:
@@ -156,6 +163,8 @@ except Exception as exc:
     Sandbox = _load_sandbox_class()
     sandbox = _create_sandbox(Sandbox)
     try:
+        _write_sandbox_file(sandbox, "/tmp/payload.json", payload_json)
+        _write_sandbox_file(sandbox, "/tmp/data_loader.py", data_loader_code)
         stdout, stderr = _run_python_in_sandbox(sandbox, runner)
     finally:
         try:
