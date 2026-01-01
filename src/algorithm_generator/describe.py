@@ -19,19 +19,31 @@ class ModelAnalyzer:
                         # Wrap in XML tags so Claude can separate them
                         all_files_content.append(f"<file name='{file}'>\n{content}\n</file>")
 
-        if not all_files_content:
-            print("No Python files found to summarize.")
-            return
+        batch_size = 20
+        index = 0
+        total_files = len(all_files_content)
+        all_summaries = []
 
-        bulk_code = "\n".join(all_files_content)
-        summary_text = self.llm_api_call(bulk_code, batch=True)
+        while index < total_files:
+            current_batch = all_files_content[index : min(index + batch_size, len(all_files_content))]
+            bulk_code = "\n".join(current_batch)
+            batch_summary = self.llm_api_call(bulk_code, batch=True)
 
-        logs_dir = os.path.join(DESCRIPTION_DIRECTORY_PATH, "evaluation_logs")
-        os.makedirs(logs_dir, exist_ok=True)
-        with open(os.path.join(logs_dir, output_file), "w", encoding="utf-8") as f:
-            f.write(summary_text)
+            if batch_summary:
+                all_summaries.append(batch_summary)
             
-        print(f"Successfully batch-summarized {len(all_files_content)} models.")
+            index += batch_size
+
+        if all_summaries:
+            summary_text = "\n".join(all_summaries)
+            logs_dir = os.path.join(DESCRIPTION_DIRECTORY_PATH, "evaluation_logs")
+            os.makedirs(logs_dir, exist_ok=True)
+            
+            with open(os.path.join(logs_dir, output_file), "w", encoding="utf-8") as f:
+                f.write(summary_text)
+            print(f"Summaries written to {output_file}")
+        else:
+            print("Failed to generate any summaries.")
         
     
     def describe_single(self, dir_path, filename):
@@ -39,7 +51,7 @@ class ModelAnalyzer:
         file_path = os.path.join(dir_path, filename)
         
         if not os.path.exists(file_path):
-            return f"Error: File {filename} not found at {dir_path}"
+            return f"Error: File not found"
 
         try:
             with open(file_path, "r", encoding="utf-8") as f:

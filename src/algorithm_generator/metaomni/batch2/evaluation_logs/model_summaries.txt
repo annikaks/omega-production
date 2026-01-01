@@ -1,0 +1,87 @@
+I'll analyze each file and provide the requested technical descriptions.
+
+GradientBoostedForestClassifier : Implements gradient boosting where each stage trains a random forest on prediction residuals rather than individual trees, with exponentially decaying learning rates across stages. The approach combines ensemble diversity from random forests with sequential error correction from boosting, using median-split pseudo-targets to convert continuous residuals into classification problems.
+
+AdaptiveKNNClassifier : Adjusts the number of neighbors k inversely proportional to local density estimates computed via kernel density estimation on k-nearest neighbor distances. Dense regions use fewer neighbors for fine-grained decisions while sparse regions use more neighbors for robust predictions, adapting the decision boundary granularity to local data topology.
+
+BaggedRandomKernelSVM : Creates an ensemble of SVM classifiers where each base learner uses bootstrap sampling combined with randomly sampled kernel hyperparameters (C, gamma, degree, coef0) from specified distributions. The diversity from randomized kernel geometries and bootstrap aggregation produces robust decision boundaries through majority voting across heterogeneous support vector machines.
+
+NoisyThresholdEnsembleClassifier : Injects Gaussian noise into decision tree split thresholds after training, creating multiple perturbed versions of each tree that are averaged for predictions. The controlled perturbations proportional to feature ranges provide regularization similar to bagging while maintaining the base tree structure, smoothing decision boundaries through threshold randomization.
+
+AdaptiveRadiusBoostingClassifier : Implements boosting by dynamically adjusting the radius of influence for each training sample based on classification performance, increasing radii for misclassified samples and decreasing radii in correctly classified dense regions. The ensemble aggregates predictions across multiple radius configurations weighted by their accuracy, creating adaptive local decision regions that focus on difficult boundaries.
+
+HistogramEnsembleClassifier : Builds an ensemble where each model discretizes features using randomly sampled histogram bin counts, then applies naive Bayes with Laplace smoothing on the discretized space. The diversity from varied binning strategies captures different feature granularities, with bootstrap sampling providing additional variance for robust probability estimation through ensemble averaging.
+
+HierarchicalDepthBoostingClassifier : Progressively increases tree depth across boosting iterations according to a schedule (linear, exponential, or step), starting with shallow trees for coarse patterns and ending with deep trees for fine-grained refinement. This hierarchical approach captures multi-scale decision boundaries by fitting residuals at increasing levels of complexity, balancing bias-variance tradeoff across the boosting sequence.
+
+StochasticEnsembleGradientClassifier : Trains multiple gradient descent paths with controlled stochastic perturbations injected into gradients at each iteration, then averages the resulting weight vectors for final predictions. The perturbation types (Gaussian, uniform, Laplace) explore different regions of the loss landscape, providing implicit regularization and robustness through ensemble averaging of perturbed optimization trajectories.
+
+ResidualAwareBoostClassifier : Extends gradient boosting by explicitly modeling the error distribution from previous iterations using separate regression trees, then uses predicted uncertainties to adaptively weight sample updates. Each weak learner predicts both residuals and expected errors, enabling error-aware sample weighting that balances standard residual fitting with uncertainty-based conservative updates for improved convergence.
+
+NoisyBaggedBoostClassifier : Combines bagging's parallel bootstrap sampling with boosting-style sequential noise injection that decays exponentially across estimators, where early trees receive high feature noise and later trees receive progressively less. The hybrid approach provides both ensemble diversity from bootstrap aggregation and sequential refinement from decreasing noise levels, with feature-wise Gaussian perturbations scaled by standard deviations.
+
+BoundaryFocusedBaggingClassifier : Dynamically adjusts bootstrap sampling weights to oversample instances near decision boundaries identified by prediction uncertainty from previous trees. Samples with probabilities close to 0.5 (binary) or high entropy (multiclass) receive amplified weights in subsequent bootstrap samples, focusing ensemble capacity on difficult boundary regions while maintaining bagging's variance reduction.
+
+KDEWeightedOOBForestClassifier : Weights each tree's vote using kernel density estimation on out-of-bag samples where the tree correctly predicted each class, creating confidence regions in feature space. Test predictions receive higher weights from trees whose KDE models assign high density to the test point for the predicted class, combining random forest diversity with density-based confidence calibration.
+
+BootstrapKNNEnsemble : Creates an ensemble of KNN classifiers with randomly sampled k values from a specified range, trained on bootstrap samples and weighted by out-of-bag accuracy. The combination of varied neighborhood sizes and bootstrap sampling provides diversity in local decision boundaries, with OOB-weighted voting emphasizing more accurate local models.
+
+HierarchicalMultiMetricKNNClassifier : Performs coarse-grained clustering with one distance metric followed by fine-grained local search with another metric, combining cluster membership distances with local neighbor distances via weighted sum. The hierarchical approach captures both global structure through clustering and local patterns through adaptive nearest neighbor search with multi-metric fusion.
+
+AdaptiveHistogramTreeClassifier : Builds decision trees with dynamically adjusted histogram bin granularity that decreases with tree depth according to exponential decay, using fine bins at shallow levels and coarse bins at deeper levels. The adaptive binning balances computational efficiency with split quality by allocating more bins where they matter most (near the root) and fewer bins in specialized deep nodes.
+
+AdaptiveDensityWeightedClassifier : Computes local density estimates via k-nearest neighbor distances, then assigns inverse density weights raised to an exponent alpha, giving higher influence to samples in sparse regions. The density-adaptive weighting in nearest neighbor voting corrects for sampling bias in imbalanced feature spaces, emphasizing underrepresented regions for improved boundary estimation.
+
+ConfidenceResidualBoostingClassifier : Trains sequential trees to predict confidence residuals (difference between ideal and current prediction confidence) rather than class residuals, weighting samples by absolute confidence errors. Each tree's contribution is scaled by confidence residuals, focusing capacity on regions where the ensemble is uncertain and enabling confidence-aware sequential refinement.
+
+HierarchicalBoostingClassifier : Implements multi-level boosting where tree complexity (depth and min_samples_split) increases progressively across hierarchical levels, with early iterations using shallow trees for coarse patterns and later iterations using deeper trees for fine details. The scheduled complexity progression captures multi-scale decision boundaries through AdaBoost or SAMME.R weighting with level-dependent weak learner capacity.
+
+AdaptiveKernelClassifier : Estimates class-conditional densities using locally-adaptive kernel bandwidths computed from nearest neighbor covariance structures, applying Scott's or Silverman's rule at each query point. The non-parametric approach adapts kernel width to local data geometry, providing flexible density estimation that captures varying scales of class distributions for Bayes-optimal classification.
+
+MultiScaleRadiusClassifier : Performs coarse-grain clustering to identify relevant regions within a large radius, then fine-grain radius search within those regions for local classification with inverse distance weighting. The multi-scale approach combines global structure from clustering with local density from radius neighbors, falling back to k-NN when insufficient samples exist within the fine radius.
+BoostedKNNClassifier : Applies AdaBoost-style boosting to k-nearest neighbors by iteratively reweighting samples based on misclassification errors, combining distance-weighted voting with exponential sample weight updates. Each iteration focuses on previously misclassified samples through adaptive weight adjustments that emphasize difficult regions.
+
+ResidualGuidedBaggingClassifier : Implements bagging where bootstrap sample weights are derived from the ensemble's prediction uncertainty measured by entropy, causing subsequent trees to focus on high-uncertainty regions. The weighting scheme combines prediction entropy with correctness indicators to adaptively oversample ambiguous decision boundaries.
+
+ResidualWeightedTreeEnsemble : Assigns tree weights proportional to their residual correction capability, measuring how many previously misclassified samples each new tree correctly predicts. Trees that reduce more ensemble error receive higher weights in the final weighted probability aggregation.
+
+ResidualMLPEnsemble : Trains sequential MLPs where each network learns the residual difference between true labels and current ensemble predictions, using exponentially decaying weights for temporal combination. Each subsequent network corrects errors from the accumulated ensemble through direct residual target learning.
+
+AdaptiveResidualLearningClassifier : Dynamically adjusts boosting learning rates based on residual distribution statistics, increasing rates in high-bias regions and decreasing in high-variance regions. The adaptation uses entropy and variance metrics to detect underfitting versus overfitting and modulates step sizes accordingly.
+
+HierarchicalDepthEnsembleClassifier : Organizes trees by depth levels from shallow to deep, weighting each level's contribution based on out-of-bag performance or adaptive strategies. Shallow trees capture coarse patterns while deep trees refine boundaries, with hierarchical aggregation balancing generalization and specialization.
+
+SequentialBoostingSVM : Sequentially trains SVMs where each model focuses on support vectors misclassified by previous models through residual-weighted sample importance. The kernel matrices are implicitly reweighted by emphasizing high-residual regions, combining AdaBoost-style weighting with SVM margin optimization.
+
+AdaptiveSubspaceForestClassifier : Adaptively selects the number of features per tree based on local data complexity measured by entropy and variance. High-complexity subsets receive more features for refined splits, while low-complexity regions use fewer features to prevent overfitting.
+
+HierarchicalMixtureOfExperts : Uses a gating network to partition input space into regions, training specialist MLPs for each region with a fallback global model. The coarse-grained gating directs samples to fine-grained experts, implementing hierarchical specialization through learned input space decomposition.
+
+MultiResolutionTreeEnsemble : Combines shallow trees for coarse pattern recognition with deep trees for fine-grained boundary refinement through weighted probability averaging. The dual-resolution approach balances bias-variance tradeoff by explicitly modeling patterns at multiple granularities.
+
+BootstrapMLPEnsemble : Trains MLPs on bootstrap samples with voting weights derived from out-of-bag accuracy estimates, emphasizing reliable models. Confidence-weighted aggregation down-weights poorly performing ensemble members based on their OOB error rates.
+
+ResidualAwareHistogramBoostingClassifier : Allocates histogram bins adaptively based on residual variance, placing more bins in high-error regions for refined gradient boosting splits. The bin allocation uses percentile-based residual thresholding to identify difficult regions requiring finer discretization.
+
+KDELeafDecisionTreeClassifier : Replaces leaf node majority voting with kernel density estimation for each class, computing Bayesian posterior probabilities from class-conditional densities. The KDE-based leaves provide smooth probabilistic predictions by modeling local class distributions non-parametrically.
+
+RadiusBootstrapEnsemble : Ensembles radius-based nearest neighbor classifiers with varying radii across bootstrap samples, combining predictions through majority voting. The radius diversity captures different locality scales while bootstrap sampling provides variance reduction.
+
+MultiGrainTreeEnsemble : Explicitly trains separate ensembles of shallow and deep trees, combining their predictions to capture both coarse global patterns and fine local interactions. The multi-grain architecture balances interpretability from shallow trees with expressive power from deep trees through weighted aggregation.
+
+DensityAwareBootstrapClassifier : Oversamples from low-density regions using inverse density weights computed via kernel density estimation, improving decision boundaries in sparse areas. The density-aware sampling corrects for imbalanced spatial distribution by emphasizing underrepresented regions.
+
+KDELeafClassifier : Fits kernel density estimators for each class at decision tree leaf nodes, using Bayes' rule to compute posterior probabilities from likelihood and prior. The KDE-based probabilistic leaves replace hard assignments with smooth density-based class probability estimates.
+
+MultiProjectionEnsembleClassifier : Creates multiple random feature subspace projections per tree, using ensemble voting across projections to select robust splits. Each tree aggregates decisions from multiple feature space views, reducing sensitivity to irrelevant features through projection diversity.
+
+KDEActivationClassifier : Replaces fixed neural network activation functions with learnable kernel density estimators that adapt to neuron activation distributions. Each neuron's KDE transforms pre-activations based on learned data-driven distributions rather than predetermined nonlinearities.
+
+AdaptiveKernelDensityClassifier : Adjusts KDE bandwidth per query point based on local sparsity measured by k-nearest neighbor distances, using larger bandwidths in sparse regions. The adaptive radius compensates for non-uniform data density, improving density estimation accuracy across varying local densities.
+ResidualPCARotationForest : Combines rotation forest with residual-based feature transformation by applying PCA to feature subsets weighted by prediction residuals from previous tree groups. The rotation matrices adapt dynamically throughout training to focus on regions where earlier trees made larger prediction errors.
+
+StochasticHistogramClassifier : Uses histogram-based discretization with stochastic bin merging during training to inject controlled noise and prevent overfitting. Adjacent bins are randomly combined across multiple iterations, and predictions aggregate class probabilities using a naive Bayes assumption over the averaged histogram distributions.
+
+MultiScaleKernelEnsembleClassifier : Employs multiple RBF kernels at different bandwidth scales and combines their predictions through density-weighted voting. Local data density estimates (via k-nearest neighbors) modulate the kernel similarity weights, giving more influence to predictions in denser regions of the feature space.
+
+MultiGrainBoostingClassifier : Implements progressive refinement boosting where tree depth increases from shallow (coarse grain) to deep (fine grain) across iterations. Early iterations establish broad decision boundaries with simple models, while later iterations use complex trees with amplified sample weights to refine predictions in persistently misclassified regions.
