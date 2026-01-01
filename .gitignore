@@ -14,3 +14,6 @@ venv
 dist/
 build/
 *.egg-info/
+
+.DS_Store
+api_setup.txt
