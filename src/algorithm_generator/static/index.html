@@ -18,10 +18,11 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
     .mjx-container { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
     .perspective-1000 { perspective: 1000px; }
-    .card-inner { transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+    .card-inner { position: relative; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s ease; width: 100%;}
     .card-flipped .card-inner { transform: rotateY(180deg); }
     .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-    .card-back { transform: rotateY(180deg); top: 0; left: 0; }
+    .card-front { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    .card-back { transform: rotateY(180deg); top: 0; left: 0; width: 100%; min-height: 85px;}
   </style>
 </head>
 
@@ -280,6 +281,9 @@
             card.className = `w-full p-4 md:p-5 rounded-xl border transition-all cursor-pointer mb-3 ${bgColor}`;
 
             card.onclick = async () => {
+                const inner = container.querySelector('.card-inner');
+                const front = container.querySelector('.card-front');
+                const back = container.querySelector('.card-back');
                 const isFlipped = card.classList.toggle('card-flipped');
                 const summaryEl = card.querySelector('.summary-text');
 
@@ -293,6 +297,9 @@
                     } catch (err) {
                         summaryEl.innerText = "Mathematical summary unavailable.";
                     }
+                    inner.style.height = back.offsetHeight + 'px';
+                } else {
+                    inner.style.height = '85px';
                 }
             };
 
