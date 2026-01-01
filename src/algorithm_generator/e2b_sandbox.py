@@ -190,7 +190,21 @@ def test_e2b_sandbox() -> Dict[str, str]:
     sandbox = _create_sandbox(Sandbox)
     try:
         stdout, stderr = _run_python_in_sandbox(
-            sandbox, "print('e2b_ok'); import sys; print(sys.version.split()[0])"
+            sandbox,
+            "import json\n"
+            "import sys\n"
+            "payload = {\n"
+            "  'python': sys.version.split()[0],\n"
+            "}\n"
+            "try:\n"
+            "  import sklearn\n"
+            "  import openml\n"
+            "  payload['sklearn'] = sklearn.__version__\n"
+            "  payload['openml'] = openml.__version__\n"
+            "  payload['openml_cache_dir'] = getattr(openml.config, 'cache_directory', None)\n"
+            "except Exception as exc:\n"
+            "  payload['error'] = f\"{type(exc).__name__}: {exc}\"\n"
+            "print(json.dumps(payload))\n",
         )
     finally:
         try:
