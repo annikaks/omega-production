@@ -24,6 +24,8 @@ from evaluate import BenchmarkSuite, eval_one_benchmark_task, BenchmarkTask
 from metaprompt import LOG_FILE, GENERATION_DIRECTORY_PATH
 from describe import ModelAnalyzer 
 
+from e2b_sandbox import run_e2b_eval, E2BSandboxError
+
 load_dotenv()
 
 URL = os.getenv("SUPABASE_URL")
@@ -138,11 +140,14 @@ async def handle_synthesis(req: SynthesisRequest):
         with open(os.path.join(GENERATION_DIRECTORY_PATH, fname), "r") as f:
             code_string = f.read()
 
-        tasks = [(n, code_string, cname, d[0], d[1], d[2], d[3]) for n, d in suite.datasets.items()]
-        with ProcessPoolExecutor(max_workers=4) as executor:
-            results_list = list(executor.map(eval_single_ds, tasks))
-
-        metrics_out = {d_n: float(c.get("Accuracy", 0.0)) for _, d_n, c, _ in results_list}
+        use_e2b = os.getenv("USE_E2B_SANDBOX", "").lower() in ("1", "true", "yes", "on")
+        if use_e2b:
+            metrics_out = run_e2b_eval(code_string, cname, suite.datasets)
+        else:
+            tasks = [(n, code_string, cname, d[0], d[1], d[2], d[3]) for n, d in suite.datasets.items()]
+            with ProcessPoolExecutor(max_workers=4) as executor:
+                results_list = list(executor.map(eval_single_ds, tasks))
+            metrics_out = {d_n: float(c.get("Accuracy", 0.0)) for _, d_n, c, _ in results_list}
         
         total_min_max = update_bounds_and_calculate_score(metrics_out)
         eval_time = time.time() - start_time
@@ -185,6 +190,9 @@ async def handle_synthesis(req: SynthesisRequest):
         new_id = db_res.data[0]['id']
 
         return {"id": new_id, "name": cname, "metrics": metrics_out, "display_acc": db_payload["min_max_score"]}
+    except E2BSandboxError as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"E2B sandbox error: {e}")
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
