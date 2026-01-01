@@ -9,3 +9,8 @@ venv
 **/venv
 
 **/__pycache__
+
+
+dist/
+build/
+*.egg-info/
