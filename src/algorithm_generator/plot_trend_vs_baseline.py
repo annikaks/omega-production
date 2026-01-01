@@ -2,6 +2,7 @@ import os
 import matplotlib.pyplot as plt
 from supabase import create_client
 from dotenv import load_dotenv
+from metaprompt import VISUALIZATION_CLASSNAME
 
 # 1. Configuration & Connection
 load_dotenv() # Ensure you have SUPABASE_URL and SUPABASE_KEY in your .env file
@@ -9,7 +10,7 @@ url = os.getenv("SUPABASE_URL")
 key = os.getenv("SUPABASE_KEY")
 supabase = create_client(url, key)
 
-TARGET_CLASS_NAME = "DimAwareForest"
+TARGET_CLASS_NAME = VISUALIZATION_CLASSNAME
 
 # 2. Dataset Column Names (Must match your SQL column order)
 datasets = [
@@ -51,15 +52,15 @@ try:
     plt.figure(figsize=(15, 7))
     
     # Benchmarks (Blue)
-    plt.plot(display_names, benchmark_1, color='#57B9FF', alpha=0.7, linestyle=':', label='HistGradientBoost')
-    plt.plot(display_names, benchmark_2, color='#57B9FF', alpha=0.7, linestyle='--', label='LogisticRegression')
-    plt.plot(display_names, benchmark_3, color='#57B9FF', alpha=0.7, linestyle='-.', label='RandomForest')
+    plt.plot(display_names, benchmark_1, color='#57B9FF', alpha=1, linestyle='-', label='HistGradientBoost')
+    plt.plot(display_names, benchmark_2, color='#BF40BF', alpha=1, linestyle='-', label='LogisticRegression')
+    plt.plot(display_names, benchmark_3, color='#097969', alpha=1, linestyle='-', label='RandomForest')
 
     # Target Model (Red)
-    plt.plot(display_names, target_values, color='#ef4444', linewidth=3, marker='o', markersize=8, label=TARGET_CLASS_NAME)
+    plt.plot(display_names, target_values, color='#ef4444', linewidth=2, marker='o', markersize=8, label=TARGET_CLASS_NAME)
 
     # Styling
-    plt.title(f"{TARGET_CLASS_NAME} vs Sklearn Baseline Classifiers", fontsize=16, fontweight='bold')
+    plt.title(f"{VISUALIZATION_CLASSNAME} vs Sk-learn Baseline Indiv. Dataset Scores", fontsize=16, fontweight='bold')
     plt.ylim(0, 1.05)
     plt.xticks(rotation=45, ha='right')
     plt.ylabel("Accuracy")
@@ -69,7 +70,7 @@ try:
     plt.tight_layout()
 
     # Save
-    filename = f"comparison_{TARGET_CLASS_NAME.lower()}.png"
+    filename = f"{TARGET_CLASS_NAME.lower()}_trendline.png"
     plt.savefig(filename, dpi=300)
     print(f"Success! Plot saved as {filename}")
 
