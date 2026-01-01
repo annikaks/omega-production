@@ -1,0 +1,85 @@
+I'll analyze each file and provide the requested technical descriptions.
+
+PolynomialARDClassifier : Combines polynomial feature expansion with Bayesian Automatic Relevance Determination to automatically prune irrelevant interaction terms through iterative optimization of feature-specific precision hyperparameters. Uses iteratively reweighted least squares within an expectation-maximization framework to estimate posterior weight distributions while adaptively regularizing each polynomial feature based on its contribution to predictive performance.
+
+WeightedPerceptronEnsemble : Trains multiple perceptrons with different random initializations and combines predictions via weighted voting where weights are proportional to individual model accuracy on training data. This ensemble approach reduces variance by averaging over different local minima found during perceptron training while emphasizing better-performing models.
+
+QuadraticStepClassifier : Implements a neural network that computes closed-form optimal step sizes per mini-batch by approximating the loss surface with a local quadratic model using diagonal Hessian estimates. The step size for each parameter is computed as the inverse of the corresponding diagonal Hessian element, enabling adaptive learning rates that account for local curvature without expensive second-order computations.
+
+AdaptiveFeatureWeightingClassifier : Computes feature importance weights using ANOVA F-statistics or variance ratios to measure discriminative power across classes, then applies weighted distance metrics for nearest-centroid classification. Features with higher between-class to within-class variance ratios receive larger weights, effectively performing automatic feature scaling based on relevance.
+
+OptimalClassRegularizedClassifier : Solves a generalized eigenvalue problem on within-class and between-class scatter matrices to derive optimal projection directions, then computes class-specific regularization parameters based on the ratio of class variance to total variance. The closed-form solution simultaneously maximizes between-class separation and minimizes within-class variance while adapting regularization strength per class.
+
+LowRankSparseClassifier : Decomposes weight matrices into a low-rank component (capturing systematic cross-feature patterns via matrix factorization) plus a sparse component (capturing feature-specific adjustments via L1 regularization). Alternating minimization updates the low-rank factors and applies soft-thresholding to the sparse component, enabling efficient representation of structured weight patterns.
+
+MixtureOfSubCentroidsClassifier : Replaces single class centroids with multiple sub-centroids obtained via k-means clustering within each class to capture multimodal within-class distributions. Classification assigns samples to the class whose nearest sub-centroid is closest, with optional weighted aggregation across sub-centroids based on cluster proportions.
+
+AdditiveRidgeSegmentClassifier : Partitions feature space into regions using decision trees, then fits piecewise-linear models with region-specific ridge regularization parameters adapted to local variance. The additive structure allows independent modeling of each feature's contribution across different segments while the adaptive regularization prevents overfitting in high-variance regions.
+
+DynamicLambdaClassifier : Implements logistic regression with a regularization schedule that exponentially, linearly, or cosinusoidally decreases from an initial high value to a final low value during training. This annealing approach starts with strong regularization to avoid poor local minima, then gradually reduces it to allow fine-tuning and better fit to training data.
+
+SparseDiscriminantClassifier : Performs linear discriminant analysis with L1-penalized optimization of discriminant directions to induce sparsity and automatic feature selection. Solves a sequence of regularized generalized eigenvalue problems where the L1 penalty encourages most coefficients to be exactly zero, yielding interpretable discriminant directions that use only relevant features.
+
+OrthogonalSubspaceClassifier : Applies Independent Component Analysis to extract statistically independent feature subspaces, then learns separate weight components for each subspace with orthogonal gradient updates. This decomposition exploits natural independence structure in data, allowing more efficient learning by updating subspace-specific parameters independently.
+
+SparsePrecisionClassifier : Estimates sparse precision (inverse covariance) matrices for each class using Graphical Lasso, which encodes conditional independence structure through zero entries in the precision matrix. Classification uses Gaussian discriminant analysis with these sparse precision matrices, providing computational efficiency and robustness in high dimensions by exploiting feature independence patterns.
+
+ConfidenceRegularizedPassiveAggressiveClassifier : Combines passive-aggressive online learning with confidence-based L1 regularization that applies soft-thresholding when prediction margins exceed a threshold. High-confidence predictions trigger sparsity-inducing updates that shrink weights toward zero, balancing aggressive updates on mistakes with conservative regularization on confident predictions.
+
+ManifoldLDA : First projects data onto a low-dimensional manifold using Isomap to capture intrinsic geometric structure and reduce noise from irrelevant dimensions, then applies Linear Discriminant Analysis in the manifold space. This two-stage approach leverages nonlinear dimensionality reduction to find a representation where linear discrimination is more effective.
+
+EnsembleNaiveBayesClassifier : Creates an ensemble of Gaussian Naive Bayes classifiers where each is trained on a random subset of features, then aggregates predictions via soft voting (averaging probabilities). This random subspace method reduces variance by decorrelating ensemble members while maintaining the computational efficiency of naive Bayes.
+
+FactorAnalysisDiscriminant : Models each class covariance as a low-rank factor loading matrix plus shared diagonal noise using factor analysis, decomposing covariance into class-specific systematic variation and common noise. Classification uses Gaussian discriminant analysis with these structured covariance models, reducing parameters while retaining discriminative information through the class-specific factor loadings.
+
+HierarchicalSmoothingClassifier : Adaptively transitions between simple Laplace smoothing in low-density regions and context-dependent smoothing in high-density regions based on local k-nearest-neighbor density estimates. Context-dependent smoothing incorporates feature co-occurrence patterns to adjust probabilities, while the hierarchical blending provides robustness across varying data densities.
+
+AdaptiveAggressivenessClassifier : Maintains an ensemble of models with varying complexity (simple logistic regression, medium random forest, complex random forest) and dynamically weights them based on per-sample prediction confidence. High-confidence predictions use simpler models (low variance), while low-confidence predictions use complex models (low bias), adaptively balancing the bias-variance tradeoff per sample.
+
+AdaptiveNoiseScaledGradientClassifier : Decomposes gradient variance into bias (mean gradient) and noise (gradient variance) components over a sliding window, then scales learning rates inversely proportional to estimated noise magnitude per parameter. Parameters with high gradient noise receive smaller learning rates to reduce instability, while stable parameters receive larger rates for faster convergence.
+
+SparseGaussianClassifier : Estimates sparse precision matrices for each class using Graphical Lasso to exploit conditional independence structure, then performs Gaussian discriminant analysis using these structured covariance models. The sparse precision matrices encode which feature pairs are conditionally independent given others, improving efficiency and robustness in high-dimensional settings.
+I'll analyze each file and provide the requested technical descriptions.
+
+CorrelatedFeatureNaiveBayes : Extends Naive Bayes by learning pairwise feature correlation weights and decomposing variance into correlated and independent components, adjusting likelihood calculations based on feature similarity patterns. The model uses correlation matrices to identify top-k correlated features per class and applies weighted similarity measures during prediction.
+
+LocalCovarianceKNNClassifier : Estimates class-conditional probability densities using locally adaptive covariance matrices computed from k-nearest neighbors rather than global covariance. For each test point, it finds k-nearest neighbors within each class and computes a local Gaussian distribution, enabling spatially-varying decision boundaries.
+
+RegularizedCovarianceClassifier : Applies Ledoit-Wolf style shrinkage to class-specific covariance matrices with per-class shrinkage intensities selected via cross-validation. The shrinkage interpolates between sample covariance and a diagonal target matrix to balance bias-variance tradeoff in covariance estimation.
+
+HierarchicalNaiveBayes : Groups features into conditionally independent clusters based on mutual information, then applies Naive Bayes within each cluster rather than across all features. Uses hierarchical clustering on a mutual information distance matrix to identify feature groups that can be treated as independent blocks.
+
+StratifiedIndependentGradientClassifier : Enforces statistical independence between gradient estimates by partitioning data into strata and rotating through them to maximize decorrelation across mini-batches. The stratification is based on both class labels and feature space quantiles, with a confidence-weighted decay that tracks stratum usage history.
+
+HierarchicalBayesianClassifier : Organizes features into groups with shared hierarchical priors where group-level means act as hyperparameters for feature-level weights. This enables information sharing within feature groups through a two-level Bayesian hierarchy with separate regularization on group means and within-group deviations.
+
+BetaBernoulliClassifier : Models feature probabilities using Beta distributions instead of point estimates, maintaining full posterior distributions over Bernoulli parameters. Predictions can use either expected values (posterior means) or Monte Carlo sampling from the Beta posteriors to quantify uncertainty.
+
+AdaptivePruningClassifier : Dynamically simplifies decision boundaries by tracking gradient magnitudes and pruning weight dimensions with consistently near-zero gradients over multiple iterations. Features are pruned when their gradient norms remain below a threshold for a specified patience period, reducing model complexity adaptively.
+
+AdditiveEnsembleCentroidClassifier : Trains multiple centroid-based classifiers on complementary random feature subspaces and combines their distance predictions additively. Classification is based on the sum of distances across all subspace-specific centroids, with probabilities derived from inverse total distances.
+
+LocalCovarianceMetricClassifier : Learns separate Mahalanobis distance metrics per class by estimating class-specific covariance matrices that capture local feature correlation structure. Each class defines its own metric space through its covariance matrix, enabling class-adaptive similarity measures.
+
+HierarchicalLDA : Builds a hierarchy of LDA models where classes are hierarchically clustered and discriminants are learned at multiple resolution levels. Coarse-level LDA models guide samples toward cluster regions, then fine-grained class-specific LDA models make final predictions within clusters.
+
+ShrunkCentroidClassifier : Decomposes class centroids into global mean (bias) plus standardized deviations (variance), applying soft-thresholding to shrink high-variance dimensions toward the global mean. The shrinkage uses pooled within-class standard deviations to standardize centroid differences before thresholding, enabling automatic feature selection.
+
+BiasVarianceMultinomialClassifier : Decomposes predictions into a base model (bias term) plus residual corrections learned from validation errors to reduce variance. The residual model is trained on augmented features combining original inputs with base predictions to learn systematic error patterns.
+
+GeodesicCovarianceEnsembleClassifier : Uses Riemannian geometry on the manifold of symmetric positive definite matrices to compute geodesic means of class covariances from bootstrap samples. The Karcher flow algorithm iteratively updates the mean on the SPD manifold using logarithmic and exponential maps rather than Euclidean averaging.
+
+CorrelationWeightedNaiveBayes : Extends Naive Bayes by learning pairwise feature correlations with confidence-based decay weights that decrease as training data increases. Correlation adjustments are applied as interaction terms between normalized features, weighted by both correlation strength and a sample-size-dependent confidence factor.
+
+AdaptiveBasisClassifier : Replaces standard sigmoid activation with learnable mixtures of basis functions (Gaussian, polynomial, or sigmoid mixtures) that adapt complexity to different data regions. Each class learns its own set of basis function parameters (centers, widths, weights) that are optimized jointly with linear coefficients.
+
+StatisticalInteractionClassifier : Introduces interaction terms only where statistical dependence tests (chi-square for categorical, Spearman for continuous) reject independence assumptions. Feature pairs are tested for dependence and only significant interactions above a p-value threshold are added to the model.
+
+SigmoidProbabilisticClassifier : Uses smooth sigmoid activation with temperature scaling and updates weights probabilistically based on prediction confidence. Higher confidence predictions have higher probability of contributing to weight updates, creating a confidence-modulated learning dynamic.
+
+AdaptiveLaplaceNB : Applies feature-specific Laplace smoothing parameters determined by cross-validation stability analysis, where features with higher variance in probability estimates receive stronger smoothing. The adaptive alpha values are computed by measuring probability estimate variance across CV folds and mapping to a specified range.
+
+HybridCoordinateGradientClassifier : Alternates between coordinate-wise closed-form Newton-Raphson updates for individual weights and full gradient descent steps for all parameters. The coordinate updates use second-order information (Hessian diagonal) for faster convergence on well-conditioned directions while gradient steps handle the full parameter space.
+ConditionalFeaturePriorClassifier : A generative classifier that models class-conditional feature distributions as a convex combination of class-specific Gaussian/Naive Bayes distributions and a globally shared prior distribution, controlled by parameter alpha. The model computes P(x|y) = alpha * P_class(x|y) + (1-alpha) * P_global(x), allowing it to interpolate between fully class-specific and fully shared feature representations for improved generalization when class-specific data is limited.
+
+BiasVarianceRidgeClassifier : A ridge regression classifier that applies separate L2 regularization penalties to the intercept term (lambda_bias) and feature weights (lambda_variance), enabling independent control over bias and variance components of the model. This decomposition allows for more nuanced regularization by penalizing the intercept and coefficients differently, which can be particularly useful when the bias term requires different shrinkage than the feature weights in the objective ||y - Xw - b||^2 + lambda_variance*||w||^2 + lambda_bias*b^2.
