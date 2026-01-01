@@ -32,12 +32,19 @@ def _create_sandbox(Sandbox):
         or os.getenv("E2B_ACCESS_TOKEN")
     )
     template = os.getenv("E2B_TEMPLATE")
+    timeout_env = os.getenv("E2B_SANDBOX_TIMEOUT")
+    timeout = None
+    if timeout_env:
+        try:
+            timeout = int(timeout_env)
+        except ValueError:
+            timeout = None
     if hasattr(Sandbox, "create"):
         try:
             return (
-                Sandbox.create(template=template, api_key=api_key)
+                Sandbox.create(template=template, api_key=api_key, timeout=timeout)
                 if api_key
-                else Sandbox.create(template=template)
+                else Sandbox.create(template=template, timeout=timeout)
             )
         except TypeError:
             return Sandbox.create()
@@ -110,6 +117,7 @@ import sys
 import traceback
 import types
 import importlib.util
+import os
 
 try:
     try:
@@ -125,6 +133,26 @@ try:
         from sklearn.metrics import accuracy_score
         from sklearn.base import clone
 
+    def _safe_name(name):
+        return name.replace(" ", "_").replace("/", "_")
+
+    def _load_cached(dataset_names):
+        cached = {{}}
+        missing = []
+        for name in dataset_names:
+            path = f"/data/benchmarks/{{_safe_name(name)}}.npz"
+            if os.path.exists(path):
+                data = np.load(path)
+                cached[name] = (
+                    data["X_train"],
+                    data["X_test"],
+                    data["y_train"],
+                    data["y_test"],
+                )
+            else:
+                missing.append(name)
+        return cached, missing
+
     payload = json.loads(open("/tmp/payload.json", "r").read())
     code_string = payload["code"]
     class_name = payload["class_name"]
@@ -134,10 +162,13 @@ try:
     exec(code_string, module.__dict__)
     Cls = getattr(module, class_name)
 
-    spec = importlib.util.spec_from_file_location("data_loader", "/tmp/data_loader.py")
-    data_loader = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(data_loader)
-    datasets = data_loader.load_classification_datasets(dataset_names)
+    cached, missing = _load_cached(dataset_names)
+    datasets = cached
+    if missing:
+        spec = importlib.util.spec_from_file_location("data_loader", "/tmp/data_loader.py")
+        data_loader = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(data_loader)
+        datasets.update(data_loader.load_classification_datasets(missing))
 
     metrics = {{}}
     for ds in datasets:
@@ -183,6 +214,170 @@ except Exception as exc:
     if not isinstance(metrics, dict):
         raise E2BSandboxError("E2B sandbox did not return metrics.")
     return {k: float(v) for k, v in metrics.items()}
+
+
+def run_e2b_generate_and_eval(
+    description: str,
+    dataset_names: List[str],
+    anthropic_api_key: str,
+) -> Dict[str, Any]:
+    payload = {
+        "description": description,
+        "dataset_names": dataset_names,
+        "anthropic_api_key": anthropic_api_key,
+    }
+
+    payload_json = json.dumps(payload)
+    data_loader_path = Path(__file__).resolve().parent / "data_loader.py"
+    if not data_loader_path.exists():
+        raise E2BSandboxError("data_loader.py not found for sandbox upload.")
+    data_loader_code = data_loader_path.read_text()
+    runner = """
+import json
+import re
+import sys
+import traceback
+import types
+import importlib.util
+import os
+
+try:
+    try:
+        import numpy as np
+        from sklearn.metrics import accuracy_score
+        from sklearn.base import clone
+    except Exception:
+        import subprocess
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "numpy", "scikit-learn"]
+        )
+        import numpy as np
+        from sklearn.metrics import accuracy_score
+        from sklearn.base import clone
+
+    try:
+        import anthropic
+    except Exception:
+        import subprocess
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "anthropic"])
+        import anthropic
+
+    def _safe_name(name):
+        return name.replace(" ", "_").replace("/", "_")
+
+    def _load_cached(dataset_names):
+        cached = {}
+        missing = []
+        for name in dataset_names:
+            path = f"/data/benchmarks/{_safe_name(name)}.npz"
+            if os.path.exists(path):
+                data = np.load(path)
+                cached[name] = (
+                    data["X_train"],
+                    data["X_test"],
+                    data["y_train"],
+                    data["y_test"],
+                )
+            else:
+                missing.append(name)
+        return cached, missing
+
+    payload = json.loads(open("/tmp/payload.json", "r").read())
+    description = payload["description"]
+    dataset_names = payload["dataset_names"]
+    api_key = payload["anthropic_api_key"]
+
+    client = anthropic.Anthropic(api_key=api_key)
+    mega_prompt = f\"\"\"
+    Design a {description} classifier in the style of SciKit learn.
+
+    1. Provide a succinct pythonic class name between <class_name></class_name> tags.
+    2. Provide a succinct pythonic filename (ending in .py) between <file_name></file_name> tags.
+    3. Provide the complete implementation in a single markdown python code block.
+
+    The class must inherit from sklearn.base.BaseEstimator.
+    Example:
+    from sklearn.base import BaseEstimator
+    class <class_name>(BaseEstimator):
+        def __init__(self, ...):
+            # All arguments must be saved as attributes
+
+    The class must implement fit(self, X_train, y_train) and predict(self, X_test).
+    Only return the tags and the code block.
+    \"\"\"
+    message = client.messages.create(
+        model="claude-sonnet-4-5-20250929",
+        max_tokens=4000,
+        temperature=0,
+        system="You are a world-class research engineer.",
+        messages=[{"role": "user", "content": [{"type": "text", "text": mega_prompt}]}],
+    )
+    response = message.content[0].text
+
+    class_name = re.search(r"<class_name>(.*?)</class_name>", response, re.DOTALL).group(1).strip()
+    file_name = re.search(r"<file_name>(.*?)</file_name>", response, re.DOTALL).group(1).strip()
+    snippets = re.findall(r"```(?:python)?\\n(.*?)```", response, re.DOTALL)
+    code_string = snippets[0].strip() if snippets else ""
+
+    cached, missing = _load_cached(dataset_names)
+    datasets = cached
+    if missing:
+        spec = importlib.util.spec_from_file_location("data_loader", "/tmp/data_loader.py")
+        data_loader = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(data_loader)
+        datasets.update(data_loader.load_classification_datasets(missing))
+
+    module = types.ModuleType("temp_mod")
+    exec(code_string, module.__dict__)
+    Cls = getattr(module, class_name)
+
+    metrics = {}
+    for ds in datasets:
+        try:
+            model = Cls()
+            try:
+                model = clone(model)
+            except Exception:
+                model = Cls()
+            X_train, X_test, y_train, y_test = datasets[ds]
+            model.fit(X_train, y_train)
+            preds = model.predict(X_test)
+            acc = accuracy_score(y_test, preds)
+            metrics[ds] = float(acc)
+        except Exception:
+            metrics[ds] = 0.0
+
+    print(
+        json.dumps(
+            {
+                "metrics": metrics,
+                "class_name": class_name,
+                "file_name": file_name,
+                "code_string": code_string,
+                "strategy": "E2B Synthesis",
+            }
+        )
+    )
+except Exception as exc:
+    print(json.dumps({"metrics": {}, "error": f"{type(exc).__name__}: {exc}"}))
+"""
+
+    Sandbox = _load_sandbox_class()
+    sandbox = _create_sandbox(Sandbox)
+    try:
+        _write_sandbox_file(sandbox, "/tmp/payload.json", payload_json)
+        _write_sandbox_file(sandbox, "/tmp/data_loader.py", data_loader_code)
+        stdout, stderr = _run_python_in_sandbox(sandbox, runner)
+    finally:
+        try:
+            sandbox.close()
+        except Exception:
+            pass
+
+    result = _extract_result(stdout)
+    if "error" in result:
+        raise E2BSandboxError(result["error"])
+    return result
 
 
 def test_e2b_sandbox() -> Dict[str, str]:
