@@ -223,7 +223,8 @@ async def get_summary(model_id: str):
             return {"summary": res.data["summary"]}
 
         summary = analyzer.describe_single(GENERATION_DIRECTORY_PATH, res.data["file_name"])
-        if " : " in summary: summary = summary.split(" : ", 1)[1]
+        if "Error" in summary: 
+            return {"summary": "Error"}
         
         supabase.table("algorithms").update({"summary": summary}).eq("id", model_id).execute()
         return {"summary": summary}
