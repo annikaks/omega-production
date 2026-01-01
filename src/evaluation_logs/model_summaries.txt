@@ -1,0 +1,409 @@
+# ML Model Classification Results
+
+NeuralNetClassifier : Implements a feedforward neural network with backpropagation using gradient descent to minimize cross-entropy loss via softmax output activation. The model learns hierarchical feature representations through multiple hidden layers with sigmoid activations, updating weights proportionally to prediction errors.
+
+DirectionalForest : Constructs an ensemble of decision trees that weight input features by their directional correlation with class separation, computed as the signed deviation of class means from overall feature means. Each tree operates on directionally-scaled features to emphasize discriminative dimensions before aggregating predictions via majority voting.
+
+AbstractionGuidedEnsembleNet : Trains multiple neural networks with progressively smaller hidden layer sizes to capture different levels of feature abstraction, then uses a meta-learner to combine their probability outputs. The ensemble leverages hierarchical representations from coarse to fine granularity, with the meta-network learning optimal weighting of abstraction levels.
+
+LinearDiscriminantAnalysis : Projects data onto a lower-dimensional space by maximizing the ratio of between-class to within-class scatter matrices via generalized eigenvalue decomposition. Classification is performed by computing Gaussian log-likelihoods in the projected space, assuming class-conditional distributions share a common covariance structure.
+
+AdaptiveKernelComplexity : Iteratively adjusts the Gaussian kernel bandwidth parameter (gamma) based on classification error, increasing complexity when error is high and decreasing when low. The model adapts the kernel's locality to find an optimal bias-variance tradeoff through gradient-free optimization of the RBF kernel width.
+
+SimilarityFeatureFuser : Groups features based on cosine similarity exceeding a threshold, then fuses each group by averaging to reduce dimensionality while preserving correlated information. The compressed feature space is then clustered using K-means, effectively performing dimensionality reduction guided by feature redundancy patterns.
+
+PerceptronClassifier : Implements the classic linear binary classifier using the perceptron learning rule, updating weights proportionally to misclassification errors via a step activation function. The algorithm iteratively adjusts the decision boundary by moving it toward misclassified points until convergence or maximum iterations.
+
+CustomPCAMultiLevelKNN : Creates multiple KNN classifiers operating on different PCA-reduced feature spaces with varying dimensionality ratios to capture multi-scale data structure. Final predictions aggregate votes across abstraction levels, combining local neighborhood information from coarse global patterns to fine-grained details.
+
+DimensionalityAdaptiveConnector : Adapts the effective dimensionality of each hidden neuron by scaling weight vectors based on gradient magnitudes, allowing neurons to specialize in different dimensional subspaces. The model dynamically adjusts neuron complexity during training, with high-gradient neurons expanding their receptive fields and low-gradient neurons contracting.
+
+AdaptiveAbstractionForest : Builds a random forest where individual trees adjust their maximum depth based on dataset size and dimensionality, using shallower trees for smaller datasets to prevent overfitting. The ensemble combines predictions from trees with varying abstraction levels, balancing model complexity with available training data.
+
+BiasVarianceOptimizedKNNEnsemble : Trains multiple KNN classifiers with different k values and combines them using weights inversely proportional to their bias-variance estimates on test data. A meta-learner further refines predictions by learning from the ensemble's probability outputs, optimizing the bias-variance tradeoff dynamically per prediction.
+
+AdaptiveDensityCompressedKNN : Compresses training data by retaining samples with probability proportional to local density, keeping more points in sparse regions and fewer in dense regions. This density-aware subsampling reduces computational cost while preserving decision boundary information where data is scarce.
+
+InteractionAwareKNN : Augments input features with polynomial interaction terms up to a specified degree, then performs KNN classification in the expanded feature space. The model captures non-linear relationships by explicitly representing feature interactions, weighted to balance original and derived features.
+
+DimAwareSplitInteractionModel : Builds a decision tree that penalizes splits on highly-interacting feature pairs by adding mutual information-based penalties to the Gini impurity criterion. This encourages the tree to avoid splitting on correlated features, reducing redundancy and improving interpretability.
+
+BalancedSimDissimKNN : Combines similarity and dissimilarity information by weighting votes from k-nearest neighbors positively and k-farthest neighbors negatively in the decision rule. This contrastive approach emphasizes class boundaries by considering both what a sample is similar to and what it differs from.
+
+BaggedDecisionTrees : Creates an ensemble by training multiple decision trees on bootstrap samples of the training data and aggregating predictions via majority voting. The bootstrap aggregating (bagging) reduces variance by averaging over diverse models trained on different random subsets.
+
+MultiLevelAbstractionKNN : Trains separate KNN classifiers on PCA-transformed feature spaces with different numbers of components, capturing data structure at multiple scales of abstraction. Predictions are combined through majority voting across abstraction levels, integrating global and local neighborhood information.
+
+FractalDimensionAdaptiveKNN : Estimates the local fractal dimension of the data manifold around each query point and adapts either the number of neighbors or distance weighting accordingly. This approach adjusts classifier complexity based on local geometric complexity, using more neighbors in smooth regions and fewer in irregular regions.
+
+QuadraticDiscriminantAnalysis : Models each class with a Gaussian distribution having its own covariance matrix, then classifies by computing class-conditional log-likelihoods with quadratic decision boundaries. Unlike LDA, QDA allows each class to have different covariance structure, capturing more complex class geometries at the cost of more parameters.
+
+DirectionalWeightedKNN : Weights nearest neighbors based on their directional alignment with the average vector pointing from the query point toward class centroids. This directional bias emphasizes neighbors that lie in the direction of class centers, improving classification when classes have directional structure in feature space.
+CompressibilitySimilarityKNN : Uses LZW compression to measure similarity between data points by computing inverse compressed size of concatenated feature vectors. Classification is performed by finding k-nearest neighbors based on compressibility similarity rather than traditional distance metrics.
+
+NaiveBayesClassifier : Implements probabilistic classification using Bayes' theorem with independence assumptions between features. Computes class priors and feature likelihoods with Laplace smoothing, then predicts by maximizing log-posterior probabilities.
+
+GradientBoostingMachine : Sequentially builds an ensemble of regression trees by fitting each tree to the negative gradient of the logistic loss function. Uses additive modeling with a learning rate to iteratively improve predictions through gradient descent in function space.
+
+RandomForestModel : Constructs an ensemble of decision trees using bootstrap sampling and information gain splitting criteria. Predictions are made by majority voting across trees, reducing variance through bagging and random feature selection.
+
+DynamicBiasVarianceForest : Adaptively adjusts tree depth and ensemble size during training based on out-of-bag performance scores. Dynamically balances model complexity by monitoring OOB accuracy trends to optimize the bias-variance tradeoff.
+
+DecisionTreeClassifier : Recursively partitions feature space by selecting splits that maximize information gain measured through entropy reduction. Builds a binary tree structure where leaf nodes represent class predictions based on majority voting.
+
+AdaptiveAbstractionNetClassifier : Neural network with multiple parallel linear transformations per layer, weighted by learnable abstraction coefficients. Enables the model to learn different levels of feature abstraction simultaneously within each layer.
+
+CompressionGuidedForest : Ensemble method that uses entropy-based compression gain as the splitting criterion for decision trees. Guides tree construction by maximizing information compression at each split to build more efficient representations.
+
+CompressibilityAdaptiveLR : Logistic regression that dynamically adjusts learning rate based on the compression ratio of model parameters using gzip. Lower compression ratios indicate more complex patterns, triggering reduced learning rates for finer optimization.
+
+KNearestNeighbors : Distance-based classifier that predicts labels by finding k training samples with minimum Euclidean or Manhattan distance. Classification is determined by majority vote among the nearest neighbors in feature space.
+
+DirectionalActivationNet : Neural network using a custom activation function that multiplies tanh output by its input, creating direction-sensitive nonlinearity. The activation preserves sign information while providing smooth gradients for backpropagation.
+
+CompressionGuidedPruner : Iteratively prunes neural network neurons based on entropy-measured importance of layer activations. Removes low-importance neurons according to a compression ratio to reduce model complexity while maintaining performance.
+
+EntropyGuidedForestGrowth : Dynamically determines ensemble size by monitoring prediction entropy during sequential tree addition. Stops growing the forest when entropy reduction falls below a threshold, preventing overfitting through early stopping.
+
+AdaptiveRandomnessNetwork : Selects between MLP, decision tree, or random forest based on computed feature entropy of training data. Adapts model complexity to data structure by measuring randomness through normalized entropy across features.
+
+EntropyGuidedKNN : Adaptively adjusts k parameter for each prediction based on local entropy of nearest neighbor labels. High entropy regions use larger k for noise reduction while low entropy regions use smaller k for fine-grained boundaries.
+
+DimAwareForest : Adapts feature selection strategy based on dimensionality ratio, using mutual information for high-dimensional data. Selects informative features before building ensemble to handle curse of dimensionality in feature-rich datasets.
+
+HybridKNNClassifier : Computes weighted combination of Euclidean distance for continuous features and Hamming distance for discrete features. Automatically determines feature types and applies appropriate distance metrics with configurable weights.
+
+DiscreteContHybridNeuron : Neural network with hybrid activation function that switches between continuous sigmoid and discrete step function based on threshold. Combines smooth gradient flow with discrete decision boundaries for mixed-type pattern learning.
+
+KNN : Classic k-nearest neighbors implementation using Euclidean distance to find k closest training samples. Predicts class labels through majority voting among nearest neighbors without explicit training phase.
+BiasVarianceBalancer : This ensemble classifier optimizes the bias-variance tradeoff by searching over tree depths on a validation set, selecting the depth that minimizes the sum of empirical bias (mean squared prediction error) and variance (across ensemble members). The final model trains multiple decision trees at the optimal depth and aggregates predictions via majority voting.
+
+ModelAnalyzer : This class wraps an Anthropic Claude API client to generate technical descriptions of machine learning model implementations, either processing files individually or in batches of up to 20 files. It uses prompt engineering to extract class names and mathematical intuitions, then optionally persists summaries to disk for documentation purposes.
+
+AlgoGen : This automated ML synthesis system uses Claude to generate scikit-learn-compatible classifier implementations from natural language descriptions, then iteratively debugs compilation/runtime errors through self-correction loops with a maximum of 2 retry attempts. It validates generated models on Iris dataset splits and maintains a CSV log of success/failure outcomes with error traces.
+
+BenchmarkSuite : This evaluation framework loads 20 classification datasets (4 sklearn built-ins + 16 OpenML datasets with preprocessing pipelines), runs models in parallel with per-task timeouts, and computes a relative aggregate score by min-max normalizing accuracies within each dataset then averaging across datasets. It outputs results as formatted tables, LaTeX, and CSV runtime statistics.
+
+PolynomialARDClassifier : This Bayesian logistic regression classifier generates polynomial interaction features up to a specified degree, then applies Automatic Relevance Determination to iteratively prune irrelevant features by estimating per-feature precision hyperparameters via evidence maximization. The model uses iterative reweighted least squares for the E-step and prunes features whose precision exceeds a threshold, effectively performing embedded feature selection.
+
+WeightedPerceptronEnsemble : This ensemble trains multiple perceptrons with different random initializations and combines their predictions via weighted voting, where weights are proportional to each perceptron's training accuracy. The approach reduces variance through ensemble averaging while adaptively emphasizing better-performing base learners.
+
+QuadraticStepClassifier : This neural network classifier computes per-parameter adaptive learning rates by approximating the loss surface with a local quadratic (using diagonal Gauss-Newton Hessian approximation) and deriving closed-form optimal step sizes as the inverse of the Hessian diagonal. This approach aims to accelerate convergence by automatically scaling gradients according to local curvature.
+
+AdaptiveFeatureWeightingClassifier : This classifier computes per-feature discriminative weights using ANOVA F-statistics (between-class to within-class variance ratio), then performs weighted distance-based classification where features with higher discriminative power contribute more to distance calculations. The approach adaptively emphasizes informative features while downweighting noisy or irrelevant dimensions.
+
+OptimalClassRegularizedClassifier : This classifier solves a generalized eigenvalue problem on within-class and between-class scatter matrices to find optimal projection directions, then derives class-specific regularization parameters proportional to each class's variance relative to total variance. Predictions use regularized weighted distances in the projected space, where each class's regularization strength inversely weights its contribution.
+
+LowRankSparseClassifier : This classifier decomposes the weight matrix into a low-rank component (capturing global feature interactions via factorization W = UV^T) plus a sparse component (capturing feature-specific adjustments via L1 regularization). The model alternates between updating the low-rank factors and applying soft-thresholding to the sparse component, balancing structured patterns with localized feature importance.
+
+MixtureOfSubCentroidsClassifier : This classifier models each class as a mixture of sub-centroids discovered via K-means clustering, capturing multimodal within-class distributions that single centroids cannot represent. Classification assigns samples to the class whose nearest sub-centroid (or weighted average distance to sub-centroids) is minimal, effectively performing local prototype-based classification.
+I'll analyze each file and provide the requested technical descriptions.
+
+AdditiveRidgeSegmentClassifier : Partitions feature space into piecewise-linear segments using decision trees, then fits additive linear models with region-specific ridge regularization within each segment. The adaptive ridge parameters are scaled inversely to local variance, allowing stronger regularization in low-variance regions and weaker regularization where data exhibits higher variability.
+
+DynamicLambdaClassifier : Implements logistic regression with time-varying L2 regularization that decreases from an initial strong penalty to a final weak penalty following exponential, linear, or cosine schedules. This dynamic regularization strategy starts with high bias to prevent overfitting early in training, then gradually reduces bias to allow the model to fit training data more closely as optimization progresses.
+
+SparseDiscriminantClassifier : Performs linear discriminant analysis with L1-penalized discriminant directions to induce sparsity in the projection matrix. The optimization alternates between maximizing the ratio of between-class to within-class scatter while applying soft-thresholding to enforce feature selection, automatically identifying the most discriminative features.
+
+OrthogonalSubspaceClassifier : Applies Independent Component Analysis to extract statistically independent feature subspaces, then learns separate weight components for each orthogonal subspace independently. This decomposition exploits natural independence structure in the data by updating each subspace's parameters without interference from other subspaces, improving learning efficiency.
+
+SparsePrecisionClassifier : Estimates sparse inverse covariance (precision) matrices for each class using Graphical Lasso, capturing conditional independence structure among features. The sparse precision matrices encode which feature pairs are conditionally independent given others, enabling more robust density estimation in high-dimensional spaces compared to full covariance matrices.
+
+AdaptiveAggressivenessClassifier : Maintains an ensemble of models with varying complexity levels and dynamically selects which model to use based on prediction confidence for each sample. High-confidence predictions use simpler models (low variance, high bias) while low-confidence predictions use complex models (high variance, low bias), adaptively balancing the bias-variance tradeoff per instance.
+
+AdaptiveNoiseScaledGradientClassifier : Decomposes gradient variance into bias and noise components by tracking gradient statistics over a sliding window, then scales learning rates inversely proportional to estimated noise magnitude per parameter. Parameters with high gradient noise receive smaller learning rates to reduce variance, while parameters with stable gradients receive larger learning rates for faster convergence.
+
+SparseGaussianClassifier : Models each class as a Gaussian distribution with sparse precision matrix estimated via Graphical Lasso, exploiting conditional independence structure in the feature space. The sparse precision matrix representation reduces the number of parameters and improves robustness by setting small partial correlations to zero, particularly beneficial in high-dimensional settings.
+
+ConfidenceRegularizedPassiveAggressiveClassifier : Combines passive-aggressive online learning with confidence-based L1 regularization that applies soft-thresholding when prediction margins exceed a threshold. When the model is highly confident (large margin), L1 penalties shrink weights toward zero to promote sparsity and prevent overfitting, while uncertain predictions trigger aggressive updates without regularization.
+
+ManifoldLDA : First projects data onto an intrinsic low-dimensional manifold using Isomap to capture nonlinear structure and reduce noise from irrelevant dimensions, then applies Linear Discriminant Analysis in the manifold space. This two-stage approach separates nonlinear dimensionality reduction from linear discrimination, improving classification when data lies on a low-dimensional manifold embedded in high-dimensional space.
+
+EnsembleNaiveBayesClassifier : Creates an ensemble of Naive Bayes classifiers where each is trained on a different random subset of features, then aggregates predictions via soft voting. This bagging-style approach reduces variance by decorrelating individual models through feature subsampling while maintaining the computational efficiency of Naive Bayes.
+
+FactorAnalysisDiscriminant : Decomposes each class covariance into class-specific factor loadings and a shared diagonal noise covariance using the factor analysis model Σ_k = Λ_k Λ_k^T + Ψ. This decomposition captures class-specific correlation structure through low-rank factor loadings while sharing common noise across classes, reducing parameters and improving generalization compared to full covariance LDA.
+
+HierarchicalSmoothingClassifier : Transitions between simple Laplace smoothing in low-density regions and context-dependent smoothing in high-density regions based on local k-nearest-neighbor density estimation. In sparse regions, uniform Laplace smoothing prevents overfitting, while in dense regions, feature co-occurrence patterns inform context-aware probability adjustments for improved accuracy.
+
+CorrelatedFeatureNaiveBayes : Extends Naive Bayes by learning pairwise feature correlation weights and decomposing variance into independent and correlated components. The model adjusts likelihood computations by adding correlation-based similarity terms that reward consistent deviations among correlated features, relaxing the independence assumption while maintaining computational tractability.
+
+LocalCovarianceKNNClassifier : Estimates class-conditional densities using Gaussian distributions with covariance matrices computed locally from k-nearest neighbors rather than globally. For each test point, the model finds nearby training samples of each class and estimates a local covariance structure, adapting to heteroscedastic data where covariance varies across feature space.
+
+RegularizedCovarianceClassifier : Applies Ledoit-Wolf shrinkage to regularize class covariance matrices by interpolating between sample covariance and a diagonal target matrix, with shrinkage intensities selected via cross-validation per class. This class-specific regularization balances bias-variance tradeoff individually for each class, improving estimation when sample sizes or intrinsic dimensionalities differ across classes.
+
+HierarchicalNaiveBayes : Groups features into conditionally independent clusters using hierarchical clustering based on mutual information distances, then models each cluster separately. This approach relaxes the full independence assumption by allowing within-cluster dependencies while maintaining between-cluster independence, reducing model complexity compared to fully dependent models.
+
+StratifiedIndependentGradientClassifier : Partitions training data into strata based on class labels and feature space quantiles, then samples mini-batches using stratified sampling with stratum rotation to maximize decorrelation between consecutive gradient estimates. This stratification ensures gradient estimates from different batches are statistically independent, reducing variance in stochastic gradient descent.
+
+HierarchicalBayesianClassifier : Organizes features into groups with hierarchical priors where feature weights within each group are drawn from a group-specific distribution, and group means are drawn from a hyperprior. This hierarchical structure enables information sharing within feature groups through partial pooling, improving estimation when related features should have similar weights.
+
+BetaBernoulliClassifier : Models feature probabilities using Beta distributions instead of point estimates, representing uncertainty in Bernoulli parameters through conjugate Bayesian updating. The Beta posterior parameters (alpha, beta) encode pseudo-counts of positive and negative observations, enabling uncertainty quantification in predictions and robust handling of small sample sizes per class.
+I'll analyze each file and provide the requested technical descriptions.
+
+AdaptivePruningClassifier : Dynamically prunes weight dimensions by tracking gradient magnitudes over consecutive iterations, removing features whose gradients consistently fall below a threshold to simplify decision boundaries. The classifier uses L2 regularization combined with gradient-history-based pruning to balance model complexity and predictive performance.
+
+AdditiveEnsembleCentroidClassifier : Creates an ensemble of centroid-based classifiers operating on randomly sampled feature subspaces, combining their distance predictions through linear summation. The additive fusion of distances from complementary feature spaces provides robustness through diversity while maintaining computational efficiency.
+
+LocalCovarianceMetricClassifier : Learns class-specific Mahalanobis distance metrics by estimating separate covariance matrices for each class, capturing local feature correlation structure. The classifier computes log-likelihoods using class-conditional Gaussian densities with regularized covariance inversion for numerical stability.
+
+HierarchicalLDA : Constructs a hierarchy of Linear Discriminant Analysis models by hierarchically clustering class centroids, enabling coarse-to-fine classification decisions. The multi-resolution discriminant structure allows progressive refinement from broad class groupings to fine-grained distinctions.
+
+ShrunkCentroidClassifier : Applies soft-thresholding to standardized centroid differences, shrinking high-variance feature dimensions toward the global mean to reduce overfitting. The bias-variance decomposition separates global mean (bias) from class-specific deviations (variance), with adaptive shrinkage controlling feature selection.
+
+BiasVarianceMultinomialClassifier : Decomposes predictions into a base model (bias term) and residual corrections learned from validation errors to reduce prediction variance. The two-stage approach learns systematic error patterns and applies weighted corrections to improve probability estimates.
+
+GeodesicCovarianceEnsembleClassifier : Performs Riemannian averaging of class covariance matrices on the manifold of symmetric positive definite matrices using geodesic interpolation. The Karcher mean computation respects the non-Euclidean geometry of covariance matrices, providing more principled ensemble aggregation than arithmetic averaging.
+
+CorrelationWeightedNaiveBayes : Extends Naive Bayes by learning pairwise feature correlations with confidence-based decay weights that diminish as training data increases. The correlation adjustments are scaled by empirical stability across cross-validation folds, gradually approaching independence assumptions with more data.
+
+AdaptiveBasisClassifier : Replaces fixed sigmoid activation with learnable mixtures of basis functions (Gaussian, polynomial, or sigmoid mixtures) that adapt to different data regions. The adaptive activation complexity adjusts to local data characteristics through gradient-based optimization of basis weights and parameters.
+
+StatisticalInteractionClassifier : Introduces interaction terms only for feature pairs that reject statistical independence via chi-square or Spearman correlation tests. The selective feature engineering reduces model complexity while capturing genuine dependencies, with significance thresholds controlling interaction sparsity.
+
+SigmoidProbabilisticClassifier : Updates weights probabilistically based on prediction confidence, with higher-confidence predictions receiving higher update probabilities. The temperature-scaled sigmoid activation and confidence-gated gradient masking provide smooth, adaptive learning dynamics.
+
+AdaptiveLaplaceNB : Varies Laplace smoothing parameters per feature based on empirical stability measured across cross-validation folds, with unstable features receiving stronger smoothing. The adaptive regularization balances between data-driven estimates and uniform priors according to feature-specific variance.
+
+HybridCoordinateGradientClassifier : Alternates between coordinate-wise closed-form Newton-Raphson updates and full gradient descent steps, combining analytical solutions where available with iterative optimization. The hybrid approach exploits convexity in individual coordinates while handling global non-convexity through gradient steps.
+
+ConditionalFeaturePriorClassifier : Models class-conditional distributions as weighted combinations of class-specific likelihoods and global feature priors, balancing specificity with generalization. The linear interpolation parameter controls the trade-off between shared structure (global prior) and class-specific patterns.
+
+BiasVarianceRidgeClassifier : Applies separate L2 regularization strengths to bias (intercept) and variance (weight) components in ridge regression. The decomposed penalty allows independent control over model offset and feature sensitivity, optimizing the bias-variance trade-off through differential shrinkage.
+
+MultiResolutionPathwayFusion : Extracts features at multiple resolutions (fine-grained pixels, edges, textures, coarse smoothed) and fuses predictions from parallel classification pathways. The multi-scale representation captures both local details and global structure, with weighted or meta-learning fusion combining pathway outputs.
+
+AdaptiveLocalPruner : Prunes neurons adaptively per input region by evaluating local bias-variance trade-offs using region-specific decision trees. The spatially-aware pruning removes neurons that increase variance without improving bias in their assigned regions, achieving region-specific model simplification.
+
+SparseDiscriminantClassifier : Performs Linear Discriminant Analysis with L1 regularization on discriminant directions to induce feature sparsity while maximizing Fisher's criterion. The sparse projection vectors are optimized via penalized Fisher ratio maximization, automatically selecting discriminative features.
+
+ManifoldLDA : Applies manifold learning (Isomap) to project data into intrinsic low-dimensional space before performing Linear Discriminant Analysis. The two-stage approach removes noise from extrinsic dimensions while preserving local geometric structure for improved discrimination.
+
+CompressionAwareLoss : Augments classification loss with model description length computed via compression algorithms (zlib or entropy), penalizing complex representations. The compression-based regularization implements minimum description length principles, favoring models with shorter encoded representations.
+LocalCovarianceKNNClassifier : This classifier estimates class-conditional densities using Gaussian distributions with covariance matrices computed locally from k-nearest neighbors rather than globally, enabling adaptive modeling of heterogeneous feature distributions. The method computes Mahalanobis distances using locally estimated covariance structures and combines them with class priors via Bayes' rule for classification.
+
+SimilarityWeightedEnsemble : This ensemble method weights base estimator predictions by the cosine similarity between test samples and training samples of each class, giving higher influence to predictions from estimators when the test point is similar to training examples of that class. The approach aggregates predictions across estimators by accumulating similarity-weighted votes for each class label.
+
+EntropyGuidedDynamicNet : This ensemble of decision trees uses local entropy computed from k-nearest neighbors to guide bootstrap sampling, where samples with higher local entropy (more uncertain regions) are sampled with higher probability. Tree depth is dynamically adjusted based on the average entropy of sampled data, allowing deeper trees for more complex decision boundaries.
+
+DirectionalFeatureExtractor : This classifier extracts orientation-selective features by convolving input images with Gabor kernels at multiple orientations, capturing directional edge information similar to visual cortex processing. The extracted features are ranked by variance and the top features are used to train a logistic regression classifier.
+
+MultiLevelAbstractionTree : This hierarchical classifier builds multiple decision trees at different abstraction levels, where each level uses progressively fewer features selected based on feature importance from the previous level. Predictions are combined via majority voting across all abstraction levels to leverage both detailed and coarse-grained decision boundaries.
+
+CompressionGuidedBagger : This bagging ensemble computes weights for each base estimator based on a combination of log-loss and prediction entropy, where lower loss and entropy indicate better compression of the data distribution. The weighted aggregation gives higher influence to estimators that achieve better compression, measured by their ability to represent data with lower uncertainty.
+
+EntropyGuidedBagger : This bagging variant uses feature-level entropy to guide feature selection for each bootstrap sample, where features with higher entropy relative to sample entropy receive higher sampling probability. This approach focuses each estimator on features that contain more information about the class distribution in the sampled data.
+
+BVOptimizedBagger : This ensemble optimizes each base estimator's hyperparameters (specifically max_depth) via cross-validation on bootstrap samples to balance bias and variance. The optimization process selects the tree depth that maximizes cross-validation score on each bootstrap sample, adapting model complexity to the local data distribution.
+
+BiasVarianceBalancingNet : This neural network uses custom layers that explicitly balance bias and variance during gradient descent by combining a regularization term (bias) with the gradient term (variance) weighted by a lambda parameter. The approach directly incorporates bias-variance tradeoff into the weight update rule rather than treating it as an emergent property.
+
+AdaptiveComplexityBagger : This bagging ensemble creates diverse estimators by randomly sampling both instances and features from the training data for each base estimator. The approach uses bootstrap sampling with configurable sample and feature fractions to generate diverse decision trees that are aggregated via majority voting.
+
+DimAwareConnector : This classifier generates random projection directions and computes pairwise feature interactions, then uses RBF kernels to map these interactions to a connection space for classification. The model learns weights via pseudo-inverse on the kernel matrix, enabling nonlinear decision boundaries through dimensionality-aware feature transformations.
+
+HingeSVM : This support vector machine implementation directly optimizes the hinge loss function combined with L2 regularization using L-BFGS-B gradient-based optimization. The hinge loss penalizes points within the margin or on the wrong side, while the regularization term controls model complexity.
+
+HybridDiscreteContForest : This random forest variant trains an ensemble of decision trees on bootstrap samples and aggregates predictions through majority voting for classification or averaging for probability estimates. The forest leverages randomness in both sample selection and tree construction to reduce variance while maintaining low bias.
+
+SimilarityAttention : This classifier uses multiple attention heads with learnable weights to compute attention-weighted cosine similarities between test samples and training samples. Predictions are made by finding training samples with similarity above a threshold and taking the majority vote of their labels, weighted by attention scores.
+
+GranularityAdaptiveBagger : This ensemble adaptively samples data at different granularity levels, where each estimator uses a random granularity factor to determine the fraction of samples and features to use. The approach creates diversity by training estimators on different resolutions of the data space, from fine-grained to coarse-grained views.
+
+DimensionalityAwareForest : This random forest trains each tree on a randomly selected subspace of features (typically sqrt of total features) to handle high-dimensional data. The subspace sampling reduces correlation between trees and helps avoid the curse of dimensionality by focusing each tree on different feature combinations.
+
+DirectionalEnsembleTrees : This ensemble projects the feature space onto random one-dimensional directions and trains decision trees on these projections, capturing different directional slices through the data. The random projections create diverse views of the data that are aggregated through majority voting for robust classification.
+
+HybridNeuronModel : This neural network uses neurons that can switch between continuous (sigmoid) and discrete (threshold) activation modes during training, allowing the model to adaptively balance smooth gradient flow with sharp decision boundaries. The periodic mode switching enables the network to explore different regions of the hypothesis space.
+
+MultiLevelAbstractionNet : This meta-ensemble trains multiple classifiers at different abstraction levels, where each level uses progressively enriched features (original features plus statistical summaries like mean, std, percentiles). Predictions are averaged across all levels and classifiers to leverage both raw and abstract representations of the data.
+
+AdaptiveComplexityNet : This neural network dynamically adds layers during training when validation accuracy plateaus below a threshold, adaptively increasing model capacity to fit complex patterns. The architecture grows from simple to complex based on learning progress, implementing a form of progressive neural architecture search.
+FractalNetArch : Implements a recursive neural network architecture where each unit spawns two sub-units at decreasing depths, creating self-similar fractal patterns. The forward pass averages outputs from parallel fractal branches while backpropagation distributes gradients through the recursive structure.
+
+CompressionDrivenLearner : Trains an autoencoder to learn compressed representations and a separate classifier on the encoded space, decoupling dimensionality reduction from classification. The two-stage approach optimizes reconstruction loss and classification loss independently to find informative low-dimensional embeddings.
+
+GradientBoostedForestClassifier : Sequentially trains random forests on prediction residuals with exponentially decaying learning rates, combining ensemble diversity with gradient boosting. Each forest corrects errors from previous forests using pseudo-targets derived from residual median splits.
+
+AdaptiveKNNClassifier : Dynamically adjusts the number of neighbors based on local density estimation, using fewer neighbors in dense regions and more in sparse regions. The adaptive k-values are computed by inverting normalized density scores to balance local versus global information.
+
+BaggedRandomKernelSVM : Creates an ensemble of SVMs with randomly sampled kernel hyperparameters (C, gamma, degree, coef0) trained on bootstrap samples. Diversity arises from both data sampling and kernel parameter randomization, with predictions aggregated through majority voting.
+
+NoisyThresholdEnsembleClassifier : Injects Gaussian noise into decision tree split thresholds after training to create diverse ensemble members from a single tree structure. The noise scale is proportional to feature ranges, and predictions are averaged across noisy versions for robustness.
+
+AdaptiveRadiusBoostingClassifier : Boosting algorithm that adjusts sample-specific influence radii based on classification performance, increasing radii for misclassified samples and decreasing for correctly classified dense regions. Ensemble predictions combine multiple radius configurations weighted by their training accuracy.
+
+HistogramEnsembleClassifier : Bootstrap ensemble where each model uses random histogram binning strategies to discretize features before building naive Bayes-style probability models. Diversity comes from varying bin counts per feature, with predictions aggregated through majority voting.
+
+HierarchicalDepthBoostingClassifier : Progressively increases tree depth across boosting iterations, starting with shallow trees for coarse patterns and ending with deep trees for fine-grained boundaries. The depth schedule (linear, exponential, or step) controls the transition from global to local feature interactions.
+
+StochasticEnsembleGradientClassifier : Injects controlled stochastic perturbations (Gaussian, uniform, or Laplace) into gradient calculations during training, creating multiple perturbed optimization paths. The ensemble averages weights from all perturbed paths to achieve robust convergence despite noisy gradients.
+
+ResidualAwareBoostClassifier : Each weak learner models both residual predictions and the error distribution from previous iterations, using uncertainty estimates to adaptively weight sample updates. The error-aware weighting reduces overfitting on difficult samples by tempering updates based on predicted uncertainty.
+
+NoisyBaggedBoostClassifier : Combines bagging's parallel bootstrap sampling with boosting-style sequential noise injection that decays across estimators. Each tree trains on noisy features with noise level proportional to feature standard deviation, decreasing exponentially to refine predictions.
+
+BoundaryFocusedBaggingClassifier : Dynamically reweights training samples based on proximity to decision boundaries identified by previous trees, amplifying sampling probability for uncertain instances. The boundary detection uses prediction uncertainty (distance from 0.5 probability) to focus subsequent trees on difficult regions.
+
+KDEWeightedOOBForestClassifier : Weights tree votes using kernel density estimation on out-of-bag samples where each tree correctly predicted each class. Trees receive higher weight for test samples in regions where they demonstrated high confidence during training, measured by KDE log-density scores.
+
+BootstrapKNNEnsemble : Ensemble of KNN classifiers with randomized k-values trained on bootstrap samples, where each classifier's vote is weighted by its out-of-bag accuracy. The combination of diverse k-values and bootstrap sampling creates varied decision boundaries aggregated through weighted voting.
+
+HierarchicalMultiMetricKNNClassifier : Uses coarse clustering with one distance metric to identify relevant regions, then applies fine-grained local distance refinement with a different metric for classification. The final distance combines cluster membership weights with local distances to balance global structure and local patterns.
+
+AdaptiveHistogramTreeClassifier : Decision tree with dynamically adjusted histogram bin granularity that decreases with tree depth, using fine bins at shallow levels and coarse bins deeper. The bin decay balances split quality at the root with computational efficiency in subtrees.
+
+AdaptiveDensityWeightedClassifier : Weights training samples inversely proportional to local density estimated via k-nearest neighbor distances, giving higher influence to samples in sparse regions. The density-based weighting combined with distance-weighted voting improves classification in imbalanced feature spaces.
+
+ConfidenceResidualBoostingClassifier : Sequential boosting where each tree predicts confidence residuals (difference between ideal and current prediction confidence) rather than class residuals. Trees are weighted by confidence residuals to focus on samples where the ensemble is uncertain, refining decision boundaries iteratively.
+
+HierarchicalBoostingClassifier : Progressively increases tree complexity (depth and minimum samples) across boosting iterations to capture coarse patterns early and fine-grained boundaries later. The hierarchical schedule transitions from shallow stumps for global structure to deep trees for local refinement.
+# Machine Learning Model Descriptions
+
+AdaptiveKernelClassifier : This classifier estimates locally-adaptive kernel bandwidths from k-nearest neighbor distributions, then computes class-conditional densities weighted by class priors for Bayes-optimal classification. The bandwidth adapts to local data geometry using covariance estimates from neighborhoods, allowing flexible decision boundaries in heterogeneous feature spaces.
+
+MultiScaleRadiusClassifier : This model performs hierarchical spatial search by first clustering the feature space into coarse-grain regions, then conducting fine-grain radius-based neighbor searches within relevant clusters. The multi-scale approach combines global structure discovery with local density-weighted voting for robust classification in non-uniform data distributions.
+
+BoostedKNNClassifier : This implements AdaBoost-style iterative reweighting on k-nearest neighbor predictions, where sample weights are exponentially increased for misclassified instances across boosting rounds. Each iteration's weighted KNN votes are combined with learned alpha coefficients derived from weighted error rates to form a strong ensemble classifier.
+
+ResidualGuidedBaggingClassifier : This bagging variant trains successive bootstrap samples weighted by prediction uncertainty (entropy) and incorrectness from the current ensemble. By focusing sampling on high-uncertainty and misclassified regions, it adaptively allocates modeling capacity to difficult decision boundaries.
+
+ResidualWeightedTreeEnsemble : This ensemble assigns each tree a weight proportional to the number of previously-misclassified samples it correctly predicts, combined with its confidence on correct predictions. Trees that reduce larger residual errors receive higher influence in the final weighted probability aggregation.
+
+ResidualMLPEnsemble : This sequential neural network ensemble trains each MLP on the residual errors (difference between true labels and current ensemble predictions) from previous networks. Exponentially-decayed weights combine predictions, allowing later networks to refine mistakes made by earlier ones through residual learning.
+
+AdaptiveResidualLearningClassifier : This gradient boosting variant dynamically adjusts learning rates per iteration based on residual statistics: increasing rates in high-bias (underfit) regions and decreasing in high-variance regions. Sample weights are also modulated by local residual characteristics to prevent overfitting in noisy areas.
+
+HierarchicalDepthEnsembleClassifier : This ensemble trains trees at multiple fixed depth levels (shallow to deep) where shallow trees capture coarse global patterns and deep trees model fine-grained interactions. Level-specific weights are computed from out-of-bag performance, and predictions are aggregated across the depth hierarchy.
+
+SequentialBoostingSVM : This boosting approach trains sequential SVMs where each new model focuses on support vectors misclassified by previous models through residual-weighted sample importance. The residual-weighted kernel matrices and AdaBoost-style alpha coefficients combine to form a strong margin-based ensemble.
+
+AdaptiveSubspaceForestClassifier : This random forest variant adaptively selects the number of features per tree based on local data complexity measured by label entropy and feature variance. High-complexity subsets receive more features to capture intricate patterns, while simple regions use fewer features to prevent overfitting.
+
+HierarchicalMixtureOfExperts : This model uses a gating network to partition input space via clustering, then trains specialist MLP networks on each region. The gating network routes test samples to appropriate experts, combining hierarchical space decomposition with specialized local models.
+
+MultiResolutionTreeEnsemble : This ensemble explicitly separates shallow trees (capturing coarse, global patterns) from deep trees (modeling fine-grained, local interactions) with independent training. Weighted combination of shallow and deep predictions provides multi-resolution decision boundaries across pattern scales.
+
+BootstrapMLPEnsemble : This bagging ensemble trains multiple MLPs on bootstrap samples and weights their predictions by out-of-bag accuracy estimates. Confidence-weighted voting emphasizes reliable models while downweighting poor performers for robust neural network ensembling.
+
+ResidualAwareHistogramBoostingClassifier : This gradient boosting classifier adaptively allocates histogram bins based on residual variance from previous iterations, placing more bins in high-error regions for refined splits. The residual-aware binning allows fine-grained boundary learning where the model struggles most.
+
+KDELeafDecisionTreeClassifier : This hybrid model replaces standard leaf node majority voting with kernel density estimation for each class, computing Bayesian posterior probabilities from class-conditional densities. The KDE-based leaf predictions provide smooth, probabilistic decision boundaries beyond discrete tree partitions.
+
+RadiusBootstrapEnsemble : This bagging ensemble trains multiple radius-based neighbor classifiers on bootstrap samples with varying radius parameters across a specified range. Majority voting across diverse radius scales provides robustness to local density variations and outliers.
+
+MultiGrainTreeEnsemble : This ensemble explicitly trains separate collections of shallow and deep trees to capture patterns at multiple granularities, then combines their predictions through soft or hard voting. The multi-grain architecture balances global pattern recognition with local boundary refinement.
+
+DensityAwareBootstrapClassifier : This classifier estimates feature space density via kernel density estimation, then performs bootstrap sampling with weights inversely proportional to density raised to a power. Oversampling from low-density regions improves decision boundaries in sparse areas where standard methods underperform.
+
+KDELeafClassifier : This decision tree variant fits separate kernel density estimators for each class at each leaf node, computing posterior probabilities via Bayes' rule with KDE likelihoods and empirical priors. The probabilistic leaf models provide smooth class probability estimates beyond hard leaf assignments.
+
+MultiProjectionEnsembleClassifier : This ensemble trains multiple trees where each tree considers multiple random feature subsets (projections) per split, using majority voting across projections to select splits. The multi-projection approach explores diverse feature space views, improving robustness to irrelevant features and complex interactions.
+I'll analyze each file and provide the requested technical descriptions.
+
+KDEActivationClassifier : Replaces fixed activation functions with kernel density estimators that adapt to local data distributions at each neuron, learning activation shapes from pre-activation statistics during training. The KDE-based activations scale neuron outputs by their probability density, creating data-dependent nonlinearities that capture distributional structure.
+
+AdaptiveKernelDensityClassifier : Estimates class-conditional densities using kernel density estimation with per-query adaptive bandwidths determined by local sparsity measured via k-nearest neighbor distances. Higher local sparsity triggers larger bandwidths to smooth density estimates in sparse regions, while dense regions use tighter kernels for finer discrimination.
+
+ResidualPCARotationForest : Constructs an ensemble where each tree operates on PCA-rotated feature subsets, with rotation matrices computed from residuals of previous tree predictions to focus subsequent trees on harder-to-classify regions. The residual-weighted PCA emphasizes directions where previous models failed, progressively refining decision boundaries.
+
+StochasticHistogramClassifier : Discretizes features into histograms then stochastically merges adjacent bins during training to inject controlled noise that prevents overfitting. The random bin merging across multiple iterations creates an ensemble of histogram representations that are averaged for robust probability estimation.
+
+MultiScaleKernelEnsembleClassifier : Combines RBF kernel predictions at multiple bandwidth scales using weights determined by local data density, allowing the classifier to adapt between global and local decision boundaries. Density-weighted voting emphasizes predictions from scales that best match the local data structure at each query point.
+
+MultiGrainBoostingClassifier : Progressively increases decision tree depth from shallow (coarse grain) to deep (fine grain) across boosting iterations, with early trees establishing broad boundaries and later trees refining misclassified regions. Sample weights are amplified in the fine-grain phase to focus deeper trees on persistent classification errors.
+
+HierarchicalQuantumStateCompressor : Builds hierarchical quantum state representations by encoding feature statistics as quantum amplitudes, then compressing across levels using mutual information to guide which features to combine. Classification uses quantum state fidelity between test samples and class-specific hierarchies, with higher levels weighted more heavily.
+
+KolmogorovQuantumCircuitClassifier : Optimizes quantum circuit structure by pruning gates that don't reduce the minimum description length (MDL), balancing model complexity against classification accuracy. The MDL principle approximates Kolmogorov complexity, removing redundant quantum operations while preserving discriminative power.
+
+MDLNeuralPruningClassifier : Prunes neural network neurons by computing importance scores from weight magnitudes and activation patterns, removing neurons whose elimination doesn't significantly increase the MDL score. The MDL criterion trades off network complexity (parameter count) against reconstruction error to find optimal compressed architectures.
+
+AdaptiveReservoirComplexityClassifier : Dynamically adjusts reservoir computing sparsity based on local Kolmogorov complexity estimates from k-nearest neighbor distances, using denser connections for complex inputs and sparser connections for simple patterns. The adaptive sparsification allows the reservoir to allocate computational resources proportional to input complexity.
+
+GeometricEnsembleCompressionClassifier : Combines predictions from multiple compression algorithms (zlib, bz2, lzma) using normalized compression distance as a similarity metric, with ensemble weights determined by geometric distances between compression methods in information space. Methods that produce similar compression patterns across the dataset receive correlated weights in the final vote.
+
+InformationGeometricClassifier : Performs gradient descent on the statistical manifold of probability distributions using the Fisher information matrix as the Riemannian metric, implementing natural gradient descent that accounts for the geometric structure of parameter space. Natural gradients follow geodesics on the probability manifold, providing more efficient optimization than standard Euclidean gradients.
+
+DifferentiableTopologyClassifier : Learns optimal filtration functions for persistent homology by computing continuous relaxations of Betti numbers using smooth sigmoid approximations of simplicial complex construction. The differentiable topological features enable gradient-based optimization of filtration parameters to maximize class separation in topological feature space.
+
+HybridHDClassifier : Encodes categorical features via binding (element-wise multiplication) and continuous features via smooth rotations in hyperdimensional space, creating unified high-dimensional representations. Classification uses cosine similarity to class prototypes formed by bundling (thresholded addition) of training samples in the hypervector space.
+
+HierarchicalFisherPoolingClassifier : Computes Fisher vector encodings at multiple spatial and scale levels, where coarse levels use larger spatial pooling and fewer Gaussian components while fine levels preserve local detail. The multi-scale Fisher vectors capture both global compressed structure and local discriminative geometry for robust classification.
+
+AntColonyHomologyClassifier : Uses ant colony optimization to discover optimal weightings of topological persistence features, with ants exploring the space of feature importance guided by pheromone trails and heuristic information from feature-class correlations. The swarm intelligence approach finds feature combinations that maximize class separability in the topological feature space.
+
+QuantumGeometricClassifier : Optimizes quantum state representations along geodesics of the Fisher information metric on the quantum probability manifold, using natural gradient descent with compression factors to move class prototypes toward optimal positions. Classification measures geodesic distance (Fubini-Study metric) between test states and class prototypes in the quantum geometric space.
+
+MDLFisherGeodesicClassifier : Selects geodesic components from the Fisher information metric eigendecomposition using the minimum description length principle, balancing data encoding cost against model complexity. The MDL criterion automatically determines the optimal number of discriminative directions that maximize class separation while minimizing parameter count.
+
+HierarchicalCompressionClassifier : Creates multi-scale data representations from coarse to fine using PCA compression and clustering, where each finer scale uses predictions from coarser scales as prior information. The hierarchical approach enables coarse models to capture global structure while fine models refine predictions using both local patterns and global context.
+
+AdaptiveHypervectorClassifier : Dynamically adjusts hypervector dimensionality during training based on class separability, expanding dimensions when classes are hard to separate and compressing when easily distinguishable. The information-geometric gradient updates move class prototypes toward their samples while dimension adaptation allocates representational capacity where needed.
+I'll analyze each file and provide the requested technical descriptions.
+
+KolmogorovEnsemblePruner : Prunes ensemble members by estimating Kolmogorov complexity via compression, removing models whose prediction patterns compress well given other members' patterns (indicating redundancy). Uses normalized compression distance (NCD) to measure pattern similarity, retaining only models that contribute unique algorithmic information to the ensemble.
+
+PSONeighborhoodClassifier : Employs particle swarm optimization to evolve self-organizing map neighborhood function parameters that minimize classification entropy across the map lattice. The swarm searches for optimal learning rate decay and neighborhood radius schedules that maximize class separation in the topological embedding.
+
+HierarchicalManifoldClassifier : Constructs a hierarchical compression tree that recursively partitions data using manifold embeddings (Isomap/PCA) at each level, creating discrete symbolic cluster assignments that compress into continuous representations. Classification combines symbolic majority voting from tree traversal with manifold-based nearest neighbor predictions weighted by an alpha parameter.
+
+BioInspiredSpeciationClassifier : Maintains diverse compression schemes through evolutionary speciation where each species uses a different dimensionality reduction method (PCA, ICA, NMF, Isomap) optimized for specific data manifold regions. Species evolve through mutation and selection based on niche-specific classification accuracy, with final predictions aggregated through fitness-weighted voting.
+
+HuffmanHDCClassifier : Encodes data in hyperdimensional space where frequently co-occurring feature patterns receive compressed (sparser) hypervector representations analogous to Huffman coding. Pattern frequencies guide the assignment of compression levels, with higher-frequency patterns allocated lower-dimensional subspaces to maximize information density.
+
+KolmogorovFractalClassifier : Combines Kolmogorov complexity approximation via compression with fractal dimension estimation (box-counting and correlation dimension) to weight distances by algorithmic information content. The classifier uses a hybrid metric where samples are compared based on both their compression-based similarity and their fractal geometric properties in the embedding space.
+
+AdaptiveComplexityClassifier : Dynamically switches between discrete symbolic (decision tree) and continuous embedding (neural network) representations based on local Kolmogorov complexity estimates computed from nearest neighbor compression. Low-complexity regions use discrete models while high-complexity regions employ continuous representations, with the threshold determined by compression ratios.
+
+AdaptiveRiemannianFisherClassifier : Learns a curvature-adaptive Riemannian metric that compresses high-curvature manifold regions (smooth class boundaries) and expands low-curvature regions (critical discrimination areas) by modifying the Fisher information metric. Local curvature estimates from neighborhood covariance structure modulate the metric tensor to allocate representational capacity based on discriminative importance.
+
+NeuralPlasticityQuantumAnnealingClassifier : Simulates quantum annealing with adaptive measurement collapse probabilities that evolve through Hebbian-like plasticity rules modulated by prediction error compression rates. The collapse probabilities adjust based on synaptic homeostasis principles, with plasticity strength inversely proportional to the rate of error reduction (compression).
+
+FisherInformationSOM : Warps self-organizing map lattice geometry using Fisher information to allocate more neurons to regions with steeper information gradients about class parameters. The lattice initialization and training sample weighting are biased by Fisher scores computed from class-conditional Mahalanobis distances.
+
+ProgressiveKolmogorovComplexityClassifier : Applies coarse-to-fine compression by first identifying high-density regions through clustering, then progressively refining local complexity estimates at multiple hierarchical levels within those regions. Classification uses normalized compression distance weighted by refinement level, with finer-scale prototypes receiving higher influence.
+
+AdaptiveTopologyClassifier : Dynamically compresses feature space in high-certainty regions and expands uncertain decision boundaries by applying topology transformations based on local k-NN prediction agreement. The transformation moves points toward or away from local neighborhood centers with factors determined by certainty thresholds.
+
+HomeostaticReservoirClassifier : Implements reservoir computing with synaptic homeostasis where connections are pruned based on usage-weighted importance to maintain target activity levels and optimal information compression capacity. Intrinsic excitability adapts through homeostatic plasticity to regulate mean neural activity toward a target setpoint.
+
+BioInspiredCAClassifier : Evolves cellular automata rules using genetic algorithms where fitness combines classification accuracy with compression ratio of correctly classified data. The CA transforms input features through local neighborhood interactions, with rule evolution optimizing both predictive performance and representational compactness.
+
+HyperdimensionalPSOClassifier : Uses particle swarm optimization to evolve class prototype hypervectors in high-dimensional space that maximize intra-class similarity while minimizing inter-class similarity. Each particle represents a candidate class hypervector that moves through the hyperdimensional space guided by cognitive and social forces toward optimal class separability.
+
+HierarchicalCAEnsembleClassifier : Constructs an ensemble where each level applies cellular automata with different neighborhood topologies (von Neumann, Moore, extended) to compress representations from the previous level. Progressive compression through random projection between levels creates a hierarchical feature hierarchy with ensemble voting across all levels.
+
+HierarchicalReservoirStructureMapper : Implements hierarchical reservoir computing with discrete symbolic transitions between layers and continuous dynamics within layers, where inter-layer communication uses quantized symbols derived from reservoir states. Each layer's continuous dynamics are discretized into symbols that seed the next layer's reservoir, creating a hybrid discrete-continuous hierarchy.
+
+GeneticCodebookClassifier : Evolves compression codebooks through genetic algorithms where fitness balances classification accuracy against codebook compactness (number of prototypes). Crossover combines parent codebooks while mutation adds, removes, or perturbs prototypes, with elitism preserving high-fitness individuals across generations.
+
+HierarchicalFractalDimensionClassifier : Computes multi-scale fractal dimension signatures by estimating local correlation dimensions at hierarchically compressed resolutions of the data manifold. Classification compares test samples to class-specific fractal signatures aggregated across scales, capturing multi-resolution geometric complexity patterns.
+
+MDLTopologicalClassifier : Compresses persistence diagrams by encoding only topological features exceeding minimum description length thresholds, filtering noise through information-theoretic criteria. Features are selected based on MDL scores that balance model complexity against data encoding length, retaining only statistically significant topological structures.
+HybridGraphEvolutionaryClassifier : This classifier evolves neural network parameters continuously via gradient descent and mutation while maintaining a discrete graph topology that constrains crossover operations between neighboring nodes. The hybrid approach combines local gradient-based optimization with graph-structured evolutionary search, where fitness-based selection occurs within graph neighborhoods defined by small-world, scale-free, ring, or complete topologies.
+
+FisherAntColonyClassifier : This classifier uses ant colony optimization to traverse a Fisher information manifold, where pheromone trails mark geodesic paths between class distributions measured by Fisher-Rao distance. Ants construct paths through landmark points that discretize the manifold, with pheromone deposition weighted by path quality and class-reaching success, ultimately classifying new points based on pheromone strength and Mahalanobis distance to class centroids.
+
+AdaptiveContextMixingClassifier : This classifier evolves compression dictionaries for each class using genetic algorithms, where fitness is measured by compression ratio on class-specific data. Classification is performed by computing compression-based distances using evolved dictionaries, with the intuition that data compresses better using dictionaries optimized for its true class due to shared statistical patterns.
+
+KolmogorovComplexityCAClassifier : This classifier prunes cellular automaton rules based on Kolmogorov complexity approximations via compression ratios, selecting simpler rules that generate lower-complexity patterns. The approach extracts features by applying selected CA rules to binarized input and uses prototype-based classification, biasing toward generalizable dynamics that avoid overfitting through complexity-based regularization.
+
+SimpleRandomForestClassifier : This classifier implements ensemble learning by training multiple decision trees on bootstrap samples with random feature subsets at each split. Predictions are made via majority voting across trees, leveraging variance reduction through averaging and decorrelation via randomized feature selection.
+
+SimpleDecisionTreeClassifier : This classifier recursively partitions feature space by selecting splits that minimize weighted Gini impurity at each node. The tree structure encodes a hierarchical decision boundary, with leaf nodes representing class predictions based on majority voting within regions.
+
+FiveLayerNeuralNetClassifier : This classifier implements a five-layer feedforward neural network with four hidden layers using ReLU/tanh/sigmoid activations and softmax output. Training uses mini-batch gradient descent with backpropagation, where He initialization and layer-wise nonlinear transformations enable learning complex decision boundaries through hierarchical feature composition.
+
+MLPClassifier5Layer : This classifier implements a five-layer multilayer perceptron with sigmoid activations in hidden layers and softmax output for multi-class classification. Training uses mini-batch stochastic gradient descent with backpropagation, computing gradients layer-by-layer from output to input via the chain rule.
+
+NeuroSymbolicRBFClassifier : This classifier combines radial basis function networks with symbolic rule induction, where RBF features are computed via Gaussian kernels centered at K-means cluster centers. Symbolic rules are extracted from RBF feature patterns using confidence and support thresholds, with predictions weighted by rule confidence and local density estimated via Gaussian mixture models.
+
+GiniDecisionTreeClassifier : This classifier builds a binary decision tree by recursively selecting feature-threshold splits that maximize Gini impurity reduction. Each internal node represents a binary decision boundary, with leaf nodes containing majority-class predictions for samples reaching that region.
+
+ManhattanWeightedKNNClassifier : This classifier predicts class labels using weighted voting from k-nearest neighbors, where distances are computed using Manhattan (L1) metric and votes are weighted by inverse-distance squared. The weighting scheme gives stronger influence to closer neighbors while maintaining robustness to the distance metric choice.
+
+TwoLayerNeuralNetClassifier : This classifier implements a two-layer feedforward neural network with one hidden layer using ReLU activation and softmax output. Training uses mini-batch gradient descent with backpropagation, where Xavier initialization and the ReLU nonlinearity enable efficient learning of nonlinear decision boundaries.
+
+GaussianNaiveBayes : This classifier assumes feature independence given class labels and models each class-conditional distribution as a multivariate Gaussian with diagonal covariance. Classification uses Bayes' theorem to compute posterior probabilities from learned class priors and Gaussian likelihood functions, with variance smoothing for numerical stability.
+
+LogisticRegressionClassifier : This classifier learns linear decision boundaries by optimizing weights via gradient descent on the cross-entropy loss, using sigmoid activation for binary classification and softmax for multi-class problems. The model computes class probabilities through a linear transformation followed by normalization, representing the log-odds as a linear function of input features.
