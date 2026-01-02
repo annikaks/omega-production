@@ -87,6 +87,18 @@ def _write_sandbox_file(sandbox: Any, path: str, content: str) -> None:
     sandbox.files.write(path, content)
 
 
+def create_e2b_sandbox() -> Any:
+    Sandbox = _load_sandbox_class()
+    return _create_sandbox(Sandbox)
+
+
+def close_e2b_sandbox(sandbox: Any) -> None:
+    try:
+        sandbox.close()
+    except Exception:
+        pass
+
+
 def _extract_result(stdout: str) -> Dict[str, Any]:
     lines = [line.strip() for line in stdout.splitlines() if line.strip()]
     for line in reversed(lines):
@@ -97,21 +109,8 @@ def _extract_result(stdout: str) -> Dict[str, Any]:
     raise E2BSandboxError("Failed to parse E2B sandbox output.")
 
 
-def run_e2b_eval(
-    code_string: str, class_name: str, dataset_names: List[str]
-) -> Dict[str, float]:
-    payload = {
-        "code": code_string,
-        "class_name": class_name,
-        "dataset_names": dataset_names,
-    }
-
-    payload_json = json.dumps(payload)
-    data_loader_path = Path(__file__).resolve().parent / "data_loader.py"
-    if not data_loader_path.exists():
-        raise E2BSandboxError("data_loader.py not found for sandbox upload.")
-    data_loader_code = data_loader_path.read_text()
-    runner = f"""
+def _build_eval_runner() -> str:
+    return """
 import json
 import sys
 import traceback
@@ -137,10 +136,10 @@ try:
         return name.replace(" ", "_").replace("/", "_")
 
     def _load_cached(dataset_names):
-        cached = {{}}
+        cached = {}
         missing = []
         for name in dataset_names:
-            path = f"/data/benchmarks/{{_safe_name(name)}}.npz"
+            path = f"/data/benchmarks/{_safe_name(name)}.npz"
             if os.path.exists(path):
                 data = np.load(path)
                 cached[name] = (
@@ -170,7 +169,7 @@ try:
         spec.loader.exec_module(data_loader)
         datasets.update(data_loader.load_classification_datasets(missing))
 
-    metrics = {{}}
+    metrics = {}
     for ds in datasets:
         try:
             model = Cls()
@@ -186,22 +185,38 @@ try:
         except Exception:
             metrics[ds] = 0.0
 
-    print(json.dumps({{"metrics": metrics}}))
+    print(json.dumps({"metrics": metrics}))
 except Exception as exc:
-    print(json.dumps({{"metrics": {{}}, "error": f"{{type(exc).__name__}}: {{exc}}"}}))
+    print(json.dumps({"metrics": {}, "error": f"{type(exc).__name__}: {exc}"}))
 """
 
-    Sandbox = _load_sandbox_class()
-    sandbox = _create_sandbox(Sandbox)
+
+def run_e2b_eval(
+    code_string: str, class_name: str, dataset_names: List[str]
+) -> Dict[str, float]:
+    payload = {
+        "code": code_string,
+        "class_name": class_name,
+        "dataset_names": dataset_names,
+    }
+
+    payload_json = json.dumps(payload)
+    data_loader_path = Path(__file__).resolve().parent / "data_loader.py"
+    if not data_loader_path.exists():
+        raise E2BSandboxError("data_loader.py not found for sandbox upload.")
+    data_loader_code = data_loader_path.read_text()
+    runner = _build_eval_runner()
+
+    sandbox = create_e2b_sandbox()
     try:
-        _write_sandbox_file(sandbox, "/tmp/payload.json", payload_json)
-        _write_sandbox_file(sandbox, "/tmp/data_loader.py", data_loader_code)
-        stdout, stderr = _run_python_in_sandbox(sandbox, runner)
+        stdout, stderr = run_e2b_eval_in_sandbox(
+            sandbox,
+            payload_json,
+            data_loader_code,
+            runner,
+        )
     finally:
-        try:
-            sandbox.close()
-        except Exception:
-            pass
+        close_e2b_sandbox(sandbox)
 
     if stderr:
         # Keep stderr available for troubleshooting, but don't fail on warnings.
@@ -216,23 +231,52 @@ except Exception as exc:
     return {k: float(v) for k, v in metrics.items()}
 
 
-def run_e2b_generate_and_eval(
-    description: str,
-    dataset_names: List[str],
-    anthropic_api_key: str,
-) -> Dict[str, Any]:
-    payload = {
-        "description": description,
-        "dataset_names": dataset_names,
-        "anthropic_api_key": anthropic_api_key,
-    }
+def run_e2b_eval_in_sandbox(
+    sandbox: Any,
+    payload_json: str,
+    data_loader_code: str,
+    runner: str,
+) -> Tuple[str, str]:
+    _write_sandbox_file(sandbox, "/tmp/payload.json", payload_json)
+    _write_sandbox_file(sandbox, "/tmp/data_loader.py", data_loader_code)
+    return _run_python_in_sandbox(sandbox, runner)
 
+
+def eval_with_sandbox(
+    sandbox: Any,
+    code_string: str,
+    class_name: str,
+    dataset_names: List[str],
+) -> Dict[str, float]:
+    payload = {
+        "code": code_string,
+        "class_name": class_name,
+        "dataset_names": dataset_names,
+    }
     payload_json = json.dumps(payload)
     data_loader_path = Path(__file__).resolve().parent / "data_loader.py"
     if not data_loader_path.exists():
         raise E2BSandboxError("data_loader.py not found for sandbox upload.")
     data_loader_code = data_loader_path.read_text()
-    runner = """
+    runner = _build_eval_runner()
+
+    stdout, _stderr = run_e2b_eval_in_sandbox(
+        sandbox,
+        payload_json,
+        data_loader_code,
+        runner,
+    )
+    result = _extract_result(stdout)
+    if "error" in result:
+        raise E2BSandboxError(result["error"])
+    metrics = result.get("metrics")
+    if not isinstance(metrics, dict):
+        raise E2BSandboxError("E2B sandbox did not return metrics.")
+    return {k: float(v) for k, v in metrics.items()}
+
+
+def _build_generate_runner() -> str:
+    return """
 import json
 import re
 import sys
@@ -362,18 +406,77 @@ except Exception as exc:
     print(json.dumps({"metrics": {}, "error": f"{type(exc).__name__}: {exc}"}))
 """
 
-    Sandbox = _load_sandbox_class()
-    sandbox = _create_sandbox(Sandbox)
-    try:
-        _write_sandbox_file(sandbox, "/tmp/payload.json", payload_json)
-        _write_sandbox_file(sandbox, "/tmp/data_loader.py", data_loader_code)
-        stdout, stderr = _run_python_in_sandbox(sandbox, runner)
-    finally:
-        try:
-            sandbox.close()
-        except Exception:
-            pass
 
+def run_e2b_generate_and_eval(
+    description: str,
+    dataset_names: List[str],
+    anthropic_api_key: str,
+) -> Dict[str, Any]:
+    payload = {
+        "description": description,
+        "dataset_names": dataset_names,
+        "anthropic_api_key": anthropic_api_key,
+    }
+
+    payload_json = json.dumps(payload)
+    data_loader_path = Path(__file__).resolve().parent / "data_loader.py"
+    if not data_loader_path.exists():
+        raise E2BSandboxError("data_loader.py not found for sandbox upload.")
+    data_loader_code = data_loader_path.read_text()
+    runner = _build_generate_runner()
+
+    sandbox = create_e2b_sandbox()
+    try:
+        stdout, stderr = run_e2b_generate_and_eval_in_sandbox(
+            sandbox,
+            payload_json,
+            data_loader_code,
+            runner,
+        )
+    finally:
+        close_e2b_sandbox(sandbox)
+
+    result = _extract_result(stdout)
+    if "error" in result:
+        raise E2BSandboxError(result["error"])
+    return result
+
+
+def run_e2b_generate_and_eval_in_sandbox(
+    sandbox: Any,
+    payload_json: str,
+    data_loader_code: str,
+    runner: str,
+) -> Tuple[str, str]:
+    _write_sandbox_file(sandbox, "/tmp/payload.json", payload_json)
+    _write_sandbox_file(sandbox, "/tmp/data_loader.py", data_loader_code)
+    return _run_python_in_sandbox(sandbox, runner)
+
+
+def generate_and_eval_with_sandbox(
+    sandbox: Any,
+    description: str,
+    dataset_names: List[str],
+    anthropic_api_key: str,
+) -> Dict[str, Any]:
+    payload = {
+        "description": description,
+        "dataset_names": dataset_names,
+        "anthropic_api_key": anthropic_api_key,
+    }
+    payload_json = json.dumps(payload)
+    data_loader_path = Path(__file__).resolve().parent / "data_loader.py"
+    if not data_loader_path.exists():
+        raise E2BSandboxError("data_loader.py not found for sandbox upload.")
+    data_loader_code = data_loader_path.read_text()
+    runner = _build_generate_runner()
+
+    stdout, _stderr = run_e2b_generate_and_eval_in_sandbox(
+        sandbox,
+        payload_json,
+        data_loader_code,
+        runner,
+    )
     result = _extract_result(stdout)
     if "error" in result:
         raise E2BSandboxError(result["error"])

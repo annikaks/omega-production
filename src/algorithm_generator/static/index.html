@@ -247,12 +247,75 @@
         });
         const data = await response.json();
         if (response.ok) {
-          lastGeneratedModel = data;
-          status.innerText = "Ranked successfully.";
-          refreshLeaderboard();
+          if (data.status === "queued") {
+            const pos = data.position ? `#${data.position}` : "pending";
+            status.innerText = `Queued: you are ${pos} in line.`;
+            if (data.job_id) {
+              pollQueueStatus(data.job_id);
+            }
+          } else if (data.status === "processing" || data.job_id) {
+            status.innerText = "Processing in sandbox...";
+            pollQueueStatus(data.job_id);
+          } else {
+            lastGeneratedModel = data;
+            const name = data.name || data.class_name || "model";
+            status.innerText = `Generated ${name}.`;
+            refreshLeaderboard();
+          }
         } else { throw new Error(data.detail); }
       } catch (err) { alert(err.message); status.innerText = "Error."; }
       finally { btn.disabled = false; btn.classList.remove('opacity-50'); }
+    }
+
+    async function pollQueueStatus(jobId) {
+      const status = document.getElementById('statusLabel');
+      let tries = 0;
+      const interval = setInterval(async () => {
+        tries += 1;
+        try {
+          const res = await fetch(`/queue-status/${jobId}`);
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || "Queue status error");
+          if (data.status === "queued") {
+            const pos = data.position ? `#${data.position}` : "pending";
+            status.innerText = `Queued: you are ${pos} in line.`;
+            return;
+          }
+          if (data.status === "processing") {
+            status.innerText = "Processing in sandbox...";
+            return;
+          }
+          if (data.status === "completed") {
+            if (!data.algorithm_id && !data.algorithm_id_text) {
+              status.innerText = "Finalizing results...";
+              return;
+            }
+            const name = data.class_name || "model";
+            status.innerText = `Generated ${name}.`;
+            clearInterval(interval);
+            refreshLeaderboard();
+            return;
+          }
+          if (data.status === "failed") {
+            const msg = data.error ? `Error: ${data.error}` : "Error in sandbox.";
+            status.innerText = `${msg} Deleted from queue.`;
+            clearInterval(interval);
+            return;
+          }
+          if (data.status === "not_found") {
+            status.innerText = "Error: job not found. Deleted from queue.";
+            clearInterval(interval);
+            return;
+          }
+        } catch (err) {
+          status.innerText = "Error checking queue status.";
+          clearInterval(interval);
+        }
+        if (tries > 120) {
+          status.innerText = "Queue status timeout.";
+          clearInterval(interval);
+        }
+      }, 2000);
     }
 
     async function refreshLeaderboard() {

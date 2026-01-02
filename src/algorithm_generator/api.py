@@ -5,6 +5,7 @@ import time
 import importlib.util
 import traceback
 import hashlib
+import logging
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 from typing import Optional, Dict, Any, List
@@ -23,10 +24,12 @@ from generate import AlgoGen
 from evaluate import BenchmarkSuite, eval_one_benchmark_task, BenchmarkTask
 from metaprompt import LOG_FILE, GENERATION_DIRECTORY_PATH
 from describe import ModelAnalyzer 
+from scoring import read_json, update_bounds_and_calculate_score
+from sandbox_queue import SandboxQueueManager
 
-from e2b_sandbox import run_e2b_eval, E2BSandboxError
-
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 URL = os.getenv("SUPABASE_URL")
 KEY = os.getenv("SUPABASE_KEY")
@@ -40,27 +43,17 @@ STORAGE_DIR = BASE_DIR / "storage"
 BOUNDS_PATH = STORAGE_DIR / "bounds.json"
 STORAGE_DIR.mkdir(exist_ok=True)
 
-def _read_json(path: Path, default: Any):
-    try:
-        if path.exists():
-            return json.loads(path.read_text())
-    except Exception: pass
-    return default
-
-def _write_json_atomic(path: Path, data: Any):
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2))
-    tmp.replace(path)
-
 algo_gen = None
 suite = None
 analyzer = None 
+queue_manager = None
 app = FastAPI(title="OMEGA")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.on_event("startup")
 def startup_event():
-    global algo_gen, suite, analyzer
+    global algo_gen, suite, analyzer, queue_manager
+    logger.info("startup_event called")
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key: raise RuntimeError("ANTHROPIC_API_KEY not set")
     
@@ -69,8 +62,30 @@ def startup_event():
     suite = BenchmarkSuite()
     analyzer = ModelAnalyzer(anthropic_client=client) 
 
+    use_e2b = os.getenv("USE_E2B_SANDBOX", "").lower() in ("1", "true", "yes", "on")
+    if use_e2b:
+        pool_size = int(os.getenv("E2B_POOL_SIZE", "15"))
+        queue_limit = int(os.getenv("E2B_QUEUE_LIMIT", "150"))
+        job_timeout_s = int(os.getenv("E2B_JOB_TIMEOUT_S", "1800"))
+        worker_count = int(os.getenv("E2B_WORKERS", str(pool_size)))
+        queue_manager = SandboxQueueManager(
+            supabase,
+            pool_size=pool_size,
+            queue_limit=queue_limit,
+            job_timeout_s=job_timeout_s,
+            worker_count=worker_count,
+        )
+        queue_manager.start()
+        logger.info(
+            "sandbox queue manager started (pool_size=%s, queue_limit=%s, workers=%s)",
+            pool_size,
+            queue_limit,
+            worker_count,
+        )
+
 @app.get("/config")
 def get_config():
+    logger.info("get_config called")
     return {
         "supabase_url": os.getenv("SUPABASE_URL"),
         "supabase_anon_key": os.getenv("SUPABASE_ANON_KEY") 
@@ -82,6 +97,7 @@ class SynthesisRequest(BaseModel):
     creator_name: str
 
 def eval_single_ds(args):
+    logger.debug("eval_single_ds called")
     dataset_name, model_content, class_name, X_train, X_test, y_train, y_test = args
     try:
         spec = importlib.util.spec_from_loader("temp_mod", loader=None)
@@ -96,58 +112,47 @@ def eval_single_ds(args):
     except Exception:
         return class_name, dataset_name, {"Accuracy": 0.0}, {}
 
-def update_bounds_and_calculate_score(new_metrics: Dict[str, float]):
-    bounds = _read_json(BOUNDS_PATH, {})
-    
-    clean_metrics = {k: (float(v) if isinstance(v, (int, float, str)) and str(v).replace('.','',1).isdigit() else 0.0) 
-                     for k, v in new_metrics.items()}
-    
-    bounds_changed = False
-    for ds, val in clean_metrics.items():
-        if ds not in bounds:
-            bounds[ds] = {"min": val, "max": val}
-            bounds_changed = True
-        else:
-            if val < bounds[ds]["min"]: 
-                bounds[ds]["min"] = val
-                bounds_changed = True
-            if val > bounds[ds]["max"]: 
-                bounds[ds]["max"] = val
-                bounds_changed = True
-    
-    if bounds_changed: 
-        _write_json_atomic(BOUNDS_PATH, bounds)
-    
-    rel_scores = []
-    for ds, val in clean_metrics.items():
-        mn, mx = bounds[ds]["min"], bounds[ds]["max"]
-        denom = mx - mn
-        score = (val - mn) / denom if denom > 0 else 1.0
-        rel_scores.append(score)
-    
-    return sum(rel_scores) / len(rel_scores) if rel_scores else 0.0
-
 @app.get("/")
 async def read_index():
+    logger.info("read_index called")
     return FileResponse(str(STATIC_DIR / "index.html"))
 
 @app.post("/generate")
 async def handle_synthesis(req: SynthesisRequest):
     try:
+        logger.info("handle_synthesis called")
         start_time = time.time()
-        gen_result = algo_gen.parallel_genML([req.description])
-        fname, cname, strategy = gen_result[0]
-        with open(os.path.join(GENERATION_DIRECTORY_PATH, fname), "r") as f:
-            code_string = f.read()
-
         use_e2b = os.getenv("USE_E2B_SANDBOX", "").lower() in ("1", "true", "yes", "on")
         if use_e2b:
-            metrics_out = run_e2b_eval(code_string, cname, suite.datasets)
+            logger.info("handle_synthesis queueing E2B sandbox job")
+            if queue_manager is None:
+                raise RuntimeError("E2B queue manager not initialized")
+            queue_res = queue_manager.enqueue_job(
+                description=req.description,
+                user_id=req.user_id,
+                creator_name=req.creator_name,
+            )
+            if queue_res.get("status") == "rejected":
+                raise HTTPException(
+                    status_code=429,
+                    detail="Queue is full, try again later.",
+                )
+            return {
+                "status": "queued",
+                "job_id": queue_res.get("job_id"),
+                "position": queue_res.get("position"),
+            }
         else:
+            logger.info("handle_synthesis using local ProcessPoolExecutor for evaluation")
+            gen_result = algo_gen.parallel_genML([req.description])
+            fname, cname, strategy = gen_result[0]
+            with open(os.path.join(GENERATION_DIRECTORY_PATH, fname), "r") as f:
+                code_string = f.read()
             tasks = [(n, code_string, cname, d[0], d[1], d[2], d[3]) for n, d in suite.datasets.items()]
             with ProcessPoolExecutor(max_workers=4) as executor:
                 results_list = list(executor.map(eval_single_ds, tasks))
             metrics_out = {d_n: float(c.get("Accuracy", 0.0)) for _, d_n, c, _ in results_list}
+            logger.info("handle_synthesis local evaluation completed in %.2fs", time.time() - start_time)
         
         total_min_max = update_bounds_and_calculate_score(metrics_out)
         eval_time = time.time() - start_time
@@ -190,15 +195,21 @@ async def handle_synthesis(req: SynthesisRequest):
         new_id = db_res.data[0]['id']
 
         return {"id": new_id, "name": cname, "metrics": metrics_out, "display_acc": db_payload["min_max_score"]}
-    except E2BSandboxError as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"E2B sandbox error: {e}")
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/queue-status/{job_id}")
+def get_queue_status(job_id: str):
+    logger.info("get_queue_status called for job_id=%s", job_id)
+    if queue_manager is None:
+        raise HTTPException(status_code=400, detail="Queue manager not enabled")
+    return queue_manager.get_job_status(job_id)
+
 @app.get("/leaderboard")
 def get_leaderboard():
+    logger.info("get_leaderboard called")
     res = supabase.table("algorithms") \
         .select("id, class_name, aggregate_acc, min_max_score, creator_name, user_prompt") \
         .order("min_max_score", desc=True) \
@@ -220,12 +231,14 @@ def get_leaderboard():
 
 @app.get("/dataset-stats")
 def get_dataset_stats():
-    data = _read_json(BOUNDS_PATH, {})
+    logger.info("get_dataset_stats called")
+    data = read_json(BOUNDS_PATH, {})
     return {"stats": dict(sorted(data.items()))}
 
 @app.get("/summarize/{model_id}")
 async def get_summary(model_id: str):
     try:
+        logger.info("get_summary called for model_id=%s", model_id)
         res = supabase.table("algorithms").select("summary, file_name").eq("id", model_id).single().execute()
         if res.data.get("summary"):
             return {"summary": res.data["summary"]}

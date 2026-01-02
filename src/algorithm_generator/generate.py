@@ -3,6 +3,7 @@ import importlib
 import os
 import re
 import traceback
+import logging
 from sklearn.metrics import accuracy_score
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
@@ -31,6 +32,8 @@ scaler = StandardScaler()
 x_train = scaler.fit_transform(x_train)
 x_test = scaler.transform(x_test)
 
+logger = logging.getLogger(__name__)
+
 class AlgoGen:
 
     def __init__(self, anthropic_client: anthropic.Anthropic, log_file: str = "experiment_log.csv"):
@@ -43,15 +46,16 @@ class AlgoGen:
         current_dir = os.path.dirname(__file__)
         metaomni_dir = os.path.join(current_dir, 'metaomni')
         if filename:
-            print(f"get_metaomni_path {os.path.join(metaomni_dir, filename)}")
+            logger.debug("get_metaomni_path %s", os.path.join(metaomni_dir, filename))
             return os.path.join(metaomni_dir, filename)
-        print(f"get_metaomni_path {metaomni_dir}")
+        logger.debug("get_metaomni_path %s", metaomni_dir)
         return metaomni_dir
 
     def gen(self, prompt: str) -> str:
         max_retries = 8 
         for attempt in range(max_retries):
             try:
+                logger.info("gen attempt %s/%s", attempt + 1, max_retries)
                 message = self.anthropic_client.messages.create(
                     model="claude-sonnet-4-5-20250929",
                     max_tokens=4000,
@@ -63,11 +67,16 @@ class AlgoGen:
             # claude overload handle
             except (InternalServerError, APIConnectionError, RateLimitError, APIStatusError) as e:
                 if attempt == max_retries - 1:
-                    print(f"Final attempt failed. Error: {e}")
+                    logger.error("Final attempt failed in gen: %s", e)
                     raise e
                 
                 wait_time = (2 ** attempt) + 2 
-                print(f"Anthropic Overloaded (Attempt {attempt+1}/{max_retries}). Waiting {wait_time}s...")
+                logger.warning(
+                    "Anthropic overloaded (attempt %s/%s). Waiting %ss...",
+                    attempt + 1,
+                    max_retries,
+                    wait_time,
+                )
                 time.sleep(wait_time)
 
     def extract_code_snippets(self, text: str) -> str:
@@ -83,10 +92,10 @@ class AlgoGen:
             
             with open(filename, 'w') as file:
                 file.write(snippets[0])
-            print(f"First code snippet saved to {filename}")
+            logger.info("First code snippet saved to %s", filename)
             return True
         else:
-            print("No code snippets found")
+            logger.warning("No code snippets found")
             return False
 
     def extract_name(self, text: str) -> str:
@@ -141,6 +150,7 @@ print("{class_name}", accuracy)
         """
         
         try:
+            logger.info("execute attempt %s for %s", count, class_name)
             exec_globals = {
                 "importlib": importlib,
                 "metaomni": metaomni,
@@ -157,7 +167,8 @@ print("{class_name}", accuracy)
         except Exception as e:
             error_message = traceback.format_exc()
             error_type = type(e).__name__
-            print("Hit error: ", error_message)
+            logger.error("execute failed with %s", error_type)
+            logger.debug("execute traceback: %s", str(error_message)[-500:])
             history.append({"attempt": count, "error": error_type, "message": error_message})
             filepath = os.path.join(GENERATION_DIRECTORY_PATH, filename)
             prompt = f"""
@@ -165,10 +176,10 @@ print("{class_name}", accuracy)
             {open(filepath, 'r').read()}
         
             Error message on original execution:
-            {e}
+            {str(e)[-500:]}
         
             Full traceback:
-            {error_message}
+            {str(error_message)[-500:]}
         
             Given the original code and this error, rewrite a {model} classifier in the style of SciKit learn, with a {class_name} class that implements the methods fit(self, X_train, y_train) and predict(self, X_test)"""
             implementation = self.gen(prompt)
@@ -234,7 +245,7 @@ print("{class_name}", accuracy)
 
             self.add_import_to_init(init_file_path, import_string)
             
-            if self.execute(filename, class_name, model, count=1):                
+            if self.execute(filename, class_name, model, count=1):
                 return (filename, class_name, model)
             else:
                 self.remove_import_from_init(init_file_path, import_string)
@@ -266,5 +277,5 @@ def generate_init_file(directory):
     with open(init_path, 'w') as init_file:
         init_file.write('\n'.join(import_statements))
     
-    print(f"__init__.py file has been generated in {directory}")
+    logger.info("__init__.py file has been generated in %s", directory)
 # generate_init_file('metaomni')
