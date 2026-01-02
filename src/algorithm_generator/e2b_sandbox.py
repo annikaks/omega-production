@@ -67,16 +67,32 @@ def _get_stream(execution: Any, name: str) -> str:
 
 
 def _run_python_in_sandbox(sandbox: Any, code: str) -> Tuple[str, str]:
+    timeout_env = os.getenv("E2B_CODE_TIMEOUT")
+    timeout = None
+    if timeout_env is not None:
+        try:
+            timeout = int(timeout_env)
+        except ValueError:
+            timeout = None
     if hasattr(sandbox, "run_code"):
-        execution = sandbox.run_code(code)
+        try:
+            execution = sandbox.run_code(code, timeout=timeout)
+        except TypeError:
+            execution = sandbox.run_code(code)
         return _get_stream(execution, "stdout"), _get_stream(execution, "stderr")
     if hasattr(sandbox, "commands") and hasattr(sandbox.commands, "run"):
         wrapped = f"python - <<'PY'\n{code}\nPY"
-        execution = sandbox.commands.run(wrapped)
+        try:
+            execution = sandbox.commands.run(wrapped, timeout=timeout)
+        except TypeError:
+            execution = sandbox.commands.run(wrapped)
         return _get_stream(execution, "stdout"), _get_stream(execution, "stderr")
     if hasattr(sandbox, "run"):
         wrapped = f"python - <<'PY'\n{code}\nPY"
-        execution = sandbox.run(wrapped)
+        try:
+            execution = sandbox.run(wrapped, timeout=timeout)
+        except TypeError:
+            execution = sandbox.run(wrapped)
         return _get_stream(execution, "stdout"), _get_stream(execution, "stderr")
     raise E2BSandboxError("Unsupported E2B SDK interface.")
 
