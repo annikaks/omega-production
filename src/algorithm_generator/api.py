@@ -24,7 +24,7 @@ from generate import AlgoGen
 from evaluate import BenchmarkSuite, eval_one_benchmark_task, BenchmarkTask
 from metaprompt import LOG_FILE, GENERATION_DIRECTORY_PATH
 from describe import ModelAnalyzer 
-from scoring import read_json, update_bounds_and_calculate_score
+from scoring import fetch_bounds_from_supabase, recompute_min_max_scores
 from sandbox_queue import SandboxQueueManager
 
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
@@ -40,7 +40,6 @@ supabase: Client = create_client(URL, KEY)
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 STORAGE_DIR = BASE_DIR / "storage"
-BOUNDS_PATH = STORAGE_DIR / "bounds.json"
 STORAGE_DIR.mkdir(exist_ok=True)
 
 algo_gen = None
@@ -162,7 +161,6 @@ async def handle_synthesis(req: SynthesisRequest):
             metrics_out = {d_n: float(c.get("Accuracy", 0.0)) for _, d_n, c, _ in results_list}
             logger.info("handle_synthesis local evaluation completed in %.2fs", time.time() - start_time)
         
-        total_min_max = update_bounds_and_calculate_score(metrics_out)
         eval_time = time.time() - start_time
 
         db_payload = {
@@ -176,7 +174,7 @@ async def handle_synthesis(req: SynthesisRequest):
             "code_hash": hashlib.sha256(code_string.strip().encode()).hexdigest(),
             "eval_time_seconds": eval_time,
             "aggregate_acc": sum(metrics_out.values()) / len(metrics_out) if metrics_out else 0,
-            "min_max_score": total_min_max,
+            "min_max_score": 0.0,
             "iris_acc": metrics_out.get("Iris", 0),
             "wine_acc": metrics_out.get("Wine", 0),
             "breast_cancer_acc": metrics_out.get("Breast Cancer", 0),
@@ -201,8 +199,11 @@ async def handle_synthesis(req: SynthesisRequest):
 
         db_res = supabase.table("algorithms").insert(db_payload).execute()
         new_id = db_res.data[0]['id']
+        recompute_min_max_scores(supabase)
+        updated = supabase.table("algorithms").select("min_max_score").eq("id", new_id).single().execute()
+        display_acc = updated.data.get("min_max_score") if updated.data else 0.0
 
-        return {"id": new_id, "name": cname, "metrics": metrics_out, "display_acc": db_payload["min_max_score"]}
+        return {"id": new_id, "name": cname, "metrics": metrics_out, "display_acc": display_acc}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -240,7 +241,7 @@ def get_leaderboard():
 @app.get("/dataset-stats")
 def get_dataset_stats():
     logger.info("get_dataset_stats called")
-    data = read_json(BOUNDS_PATH, {})
+    data = fetch_bounds_from_supabase(supabase)
     return {"stats": dict(sorted(data.items()))}
 
 @app.get("/summarize/{model_id}")

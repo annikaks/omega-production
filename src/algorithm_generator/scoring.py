@@ -1,62 +1,80 @@
-import json
-from pathlib import Path
-from typing import Any, Dict
+from typing import Dict, Iterable, List, Tuple
 
 
-BASE_DIR = Path(__file__).resolve().parent
-STORAGE_DIR = BASE_DIR / "storage"
-BOUNDS_PATH = STORAGE_DIR / "bounds.json"
-STORAGE_DIR.mkdir(exist_ok=True)
+DATASET_COLUMNS: List[Tuple[str, str]] = [
+    ("Iris", "iris_acc"),
+    ("Wine", "wine_acc"),
+    ("Breast Cancer", "breast_cancer_acc"),
+    ("Digits", "digits_acc"),
+    ("Balance Scale", "balance_scale_acc"),
+    ("Blood Transfusion", "blood_transfusion_acc"),
+    ("Haberman", "haberman_acc"),
+    ("Seeds", "seeds_acc"),
+    ("Teaching Assistant", "teaching_assistant_acc"),
+    ("Zoo", "zoo_acc"),
+    ("Planning Relax", "planning_relax_acc"),
+    ("Ionosphere", "ionosphere_acc"),
+    ("Sonar", "sonar_acc"),
+    ("Glass", "glass_acc"),
+    ("Vehicle", "vehicle_acc"),
+    ("Liver Disorders", "liver_disorders_acc"),
+    ("Heart Statlog", "heart_statlog_acc"),
+    ("Pima Indians Diabetes", "pima_diabetes_acc"),
+    ("Australian", "australian_acc"),
+    ("Monks-1", "monks_1_acc"),
+]
 
 
-def read_json(path: Path, default: Any):
+def _coerce_float(value) -> float:
     try:
-        if path.exists():
-            return json.loads(path.read_text())
-    except Exception:
-        pass
-    return default
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
 
 
-def write_json_atomic(path: Path, data: Any) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2))
-    tmp.replace(path)
-
-
-def update_bounds_and_calculate_score(new_metrics: Dict[str, float]) -> float:
-    bounds = read_json(BOUNDS_PATH, {})
-
-    clean_metrics = {
-        k: (
-            float(v)
-            if isinstance(v, (int, float, str)) and str(v).replace(".", "", 1).isdigit()
-            else 0.0
-        )
-        for k, v in new_metrics.items()
-    }
-
-    bounds_changed = False
-    for ds, val in clean_metrics.items():
-        if ds not in bounds:
-            bounds[ds] = {"min": val, "max": val}
-            bounds_changed = True
+def compute_bounds_from_rows(rows: Iterable[Dict[str, object]]) -> Dict[str, Dict[str, float]]:
+    bounds: Dict[str, Dict[str, float]] = {}
+    for dataset, column in DATASET_COLUMNS:
+        values: List[float] = []
+        for row in rows:
+            if column in row and row[column] is not None:
+                values.append(_coerce_float(row[column]))
+        if values:
+            bounds[dataset] = {"min": min(values), "max": max(values)}
         else:
-            if val < bounds[ds]["min"]:
-                bounds[ds]["min"] = val
-                bounds_changed = True
-            if val > bounds[ds]["max"]:
-                bounds[ds]["max"] = val
-                bounds_changed = True
+            bounds[dataset] = {"min": 0.0, "max": 0.0}
+    return bounds
 
-    if bounds_changed:
-        write_json_atomic(BOUNDS_PATH, bounds)
 
-    rel_scores = []
-    for ds, val in clean_metrics.items():
-        mn, mx = bounds[ds]["min"], bounds[ds]["max"]
+def calculate_min_max_score(metrics: Dict[str, float], bounds: Dict[str, Dict[str, float]]) -> float:
+    rel_scores: List[float] = []
+    for dataset, _column in DATASET_COLUMNS:
+        val = _coerce_float(metrics.get(dataset))
+        mn = bounds.get(dataset, {}).get("min", 0.0)
+        mx = bounds.get(dataset, {}).get("max", 0.0)
         denom = mx - mn
         score = (val - mn) / denom if denom > 0 else 1.0
         rel_scores.append(score)
-
     return sum(rel_scores) / len(rel_scores) if rel_scores else 0.0
+
+
+def fetch_bounds_from_supabase(supabase) -> Dict[str, Dict[str, float]]:
+    columns = ",".join([column for _dataset, column in DATASET_COLUMNS])
+    res = supabase.table("algorithms").select(columns).execute()
+    rows = res.data or []
+    return compute_bounds_from_rows(rows)
+
+
+def recompute_min_max_scores(supabase) -> Dict[str, Dict[str, float]]:
+    columns = ",".join(["id"] + [column for _dataset, column in DATASET_COLUMNS])
+    res = supabase.table("algorithms").select(columns).execute()
+    rows = res.data or []
+    bounds = compute_bounds_from_rows(rows)
+    for row in rows:
+        metrics = {
+            dataset: _coerce_float(row.get(column))
+            for dataset, column in DATASET_COLUMNS
+        }
+        score = calculate_min_max_score(metrics, bounds)
+        supabase.table("algorithms").update({"min_max_score": score}).eq("id", row["id"]).execute()
+    return bounds

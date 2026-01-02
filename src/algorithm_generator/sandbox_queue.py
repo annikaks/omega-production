@@ -18,7 +18,7 @@ from e2b_sandbox import (
     close_e2b_sandbox,
     generate_and_eval_with_sandbox,
 )
-from scoring import update_bounds_and_calculate_score
+from scoring import recompute_min_max_scores
 
 
 logger = logging.getLogger(__name__)
@@ -267,7 +267,6 @@ class SandboxQueueManager:
         code_string = result.get("code_string") or ""
         strategy = result.get("strategy") or "E2B Synthesis"
 
-        total_min_max = update_bounds_and_calculate_score(metrics)
         db_payload = {
             "user_id": user_id,
             "creator_name": creator_name,
@@ -279,7 +278,7 @@ class SandboxQueueManager:
             "code_hash": hashlib.sha256(code_string.strip().encode()).hexdigest(),
             "eval_time_seconds": eval_time,
             "aggregate_acc": sum(metrics.values()) / len(metrics) if metrics else 0,
-            "min_max_score": total_min_max,
+            "min_max_score": 0.0,
             "iris_acc": metrics.get("Iris", 0),
             "wine_acc": metrics.get("Wine", 0),
             "breast_cancer_acc": metrics.get("Breast Cancer", 0),
@@ -313,6 +312,10 @@ class SandboxQueueManager:
             self._mark_failed(job_id, "Database error while saving results.")
             return
         algorithm_id = db_res.data[0]["id"] if db_res.data else None
+        try:
+            recompute_min_max_scores(self.supabase)
+        except Exception as exc:
+            logger.error("Failed to recompute min_max_score bounds: %s", exc)
         update_payload = {
             "status": "completed",
             "finished_at": datetime.utcnow().isoformat(),
