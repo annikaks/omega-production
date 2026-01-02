@@ -248,12 +248,21 @@ def get_dataset_stats():
 async def get_summary(model_id: str):
     try:
         logger.info("get_summary called for model_id=%s", model_id)
-        res = supabase.table("algorithms").select("summary, file_name").eq("id", model_id).single().execute()
+        res = (
+            supabase.table("algorithms")
+            .select("summary, file_name, algorithm_code")
+            .eq("id", model_id)
+            .single()
+            .execute()
+        )
         if res.data.get("summary"):
             return {"summary": res.data["summary"]}
 
-        summary = analyzer.describe_single(GENERATION_DIRECTORY_PATH, res.data["file_name"])
-        if "Error" in summary: 
+        if res.data.get("algorithm_code"):
+            summary = analyzer.describe_code(res.data["algorithm_code"])
+        else:
+            summary = analyzer.describe_single(GENERATION_DIRECTORY_PATH, res.data["file_name"])
+        if "Error" in summary:
             return {"summary": "Error"}
         
         supabase.table("algorithms").update({"summary": summary}).eq("id", model_id).execute()
