@@ -261,10 +261,16 @@
             const name = data.name || data.class_name || "model";
             status.innerText = `Generated ${name}.`;
             refreshLeaderboard();
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
           }
         } else { throw new Error(data.detail); }
-      } catch (err) { alert(err.message); status.innerText = "Error."; }
-      finally { btn.disabled = false; btn.classList.remove('opacity-50'); }
+      } catch (err) {
+        alert(err.message);
+        status.innerText = "Error.";
+        btn.disabled = false;
+        btn.classList.remove('opacity-50');
+      }
     }
 
     async function pollQueueStatus(jobId) {
@@ -294,26 +300,41 @@
             status.innerText = `Generated ${name}.`;
             clearInterval(interval);
             refreshLeaderboard();
+            const btn = document.getElementById('btn');
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
             return;
           }
           if (data.status === "failed") {
             const msg = data.error ? `Error: ${data.error}` : "Error in sandbox.";
             status.innerText = `${msg} Deleted from queue.`;
             clearInterval(interval);
+            const btn = document.getElementById('btn');
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
             return;
           }
           if (data.status === "not_found") {
             status.innerText = "Error: job not found. Deleted from queue.";
             clearInterval(interval);
+            const btn = document.getElementById('btn');
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
             return;
           }
         } catch (err) {
           status.innerText = "Error checking queue status.";
           clearInterval(interval);
+          const btn = document.getElementById('btn');
+          btn.disabled = false;
+          btn.classList.remove('opacity-50');
         }
         if (tries > 120) {
           status.innerText = "Queue status timeout.";
           clearInterval(interval);
+          const btn = document.getElementById('btn');
+          btn.disabled = false;
+          btn.classList.remove('opacity-50');
         }
       }, 2000);
     }
