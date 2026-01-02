@@ -146,8 +146,16 @@ async def handle_synthesis(req: SynthesisRequest):
             logger.info("handle_synthesis using local ProcessPoolExecutor for evaluation")
             gen_result = algo_gen.parallel_genML([req.description])
             fname, cname, strategy = gen_result[0]
-            with open(os.path.join(GENERATION_DIRECTORY_PATH, fname), "r") as f:
+            file_path = os.path.join(GENERATION_DIRECTORY_PATH, fname)
+            with open(file_path, "r") as f:
                 code_string = f.read()
+            try:
+                import_string = f"from {IMPORT_STRUCTURE_PREFIX}{fname.split('.py')[0]} import *"
+                init_file_path = os.path.join(GENERATION_DIRECTORY_PATH, "__init__.py")
+                algo_gen.remove_import_from_init(init_file_path, import_string)
+                os.remove(file_path)
+            except Exception as exc:
+                logger.warning("Failed to clean up generated file %s: %s", file_path, exc)
             tasks = [(n, code_string, cname, d[0], d[1], d[2], d[3]) for n, d in suite.datasets.items()]
             with ProcessPoolExecutor(max_workers=4) as executor:
                 results_list = list(executor.map(eval_single_ds, tasks))
