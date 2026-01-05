@@ -9,6 +9,13 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 import httpx
+import anthropic
+from anthropic import (
+    InternalServerError,
+    APIConnectionError,
+    RateLimitError,
+    APIStatusError,
+)
 from postgrest.exceptions import APIError
 from supabase import Client
 
@@ -37,6 +44,7 @@ class SandboxQueueManager:
         retry_backoff_s: float = 0.5,
         queue_table: str = "sandbox_queue",
     ) -> None:
+        self.instance_id = os.getenv("QUEUE_INSTANCE_ID") or str(uuid.uuid4())
         self.supabase = supabase
         self.pool_size = pool_size
         self.queue_limit = queue_limit
@@ -61,6 +69,7 @@ class SandboxQueueManager:
             )
             self._worker_threads.append(thread)
             thread.start()
+            logger.info("worker started instance=%s name=%s", self.instance_id, thread.name)
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -90,7 +99,13 @@ class SandboxQueueManager:
         row = res.data[0] if res.data else insert_payload
         created_at = row.get("created_at")
         position = self._queue_position(created_at)
-        logger.info("queued job_id=%s position=%s queued=%s", job_id, position, queued_count + 1)
+        logger.info(
+            "queued job_id=%s position=%s queued=%s instance=%s",
+            job_id,
+            position,
+            queued_count + 1,
+            self.instance_id,
+        )
         return {
             "status": "queued",
             "job_id": job_id,
@@ -143,7 +158,9 @@ class SandboxQueueManager:
         return response
 
     def _worker_loop(self) -> None:
+        worker_name = threading.current_thread().name
         while not self._stop_event.is_set():
+            logger.debug("worker=%s polling for job", worker_name)
             try:
                 job = self._fetch_next_job()
             except Exception as exc:
@@ -151,16 +168,41 @@ class SandboxQueueManager:
                 time.sleep(self.poll_interval_s)
                 continue
             if not job:
+                logger.debug("worker=%s no job found; sleeping", worker_name)
                 time.sleep(self.poll_interval_s)
                 continue
 
+            logger.info("worker=%s fetched job_id=%s", worker_name, job.get("id"))
             if not self._sandbox_slots.acquire(timeout=self.poll_interval_s):
+                logger.info(
+                    "worker=%s no sandbox slots; job_id=%s will retry",
+                    worker_name,
+                    job.get("id"),
+                )
                 continue
             started_at = datetime.utcnow().isoformat()
             if not self._claim_job(job["id"], started_at):
+                logger.info(
+                    "worker=%s claim failed for job_id=%s; likely already claimed",
+                    worker_name,
+                    job.get("id"),
+                )
                 self._sandbox_slots.release()
                 continue
-            logger.info("processing job_id=%s description=%s", job["id"], job.get("description"))
+            logger.info(
+                "worker=%s claimed job_id=%s started_at=%s instance=%s",
+                worker_name,
+                job.get("id"),
+                started_at,
+                self.instance_id,
+            )
+            logger.info(
+                "worker=%s processing job_id=%s description=%s instance=%s",
+                worker_name,
+                job["id"],
+                job.get("description"),
+                self.instance_id,
+            )
             try:
                 sandbox = self._create_sandbox_with_retry()
             except Exception as exc:
@@ -208,6 +250,7 @@ class SandboxQueueManager:
         prev_level = httpx_logger.level
         httpx_logger.setLevel(logging.WARNING)
         try:
+            logger.debug("polling for queued job")
             res = self._execute_with_retry(
                 lambda: self.supabase.table(self.queue_table)
                 .select("*")
@@ -222,10 +265,31 @@ class SandboxQueueManager:
         if not res.data:
             queued_count = self._count_by_status("queued")
             if queued_count:
-                logger.info("queue has %s queued jobs but none fetched", queued_count)
+                logger.warning("queue has %s queued jobs but none fetched", queued_count)
+                try:
+                    sample = self._execute_with_retry(
+                        lambda: self.supabase.table(self.queue_table)
+                        .select("id,created_at,status")
+                        .eq("status", "queued")
+                        .order("created_at")
+                        .limit(5)
+                        .execute(),
+                        "fetch_next_job_sample",
+                    )
+                    sample_rows = sample.data or []
+                    logger.warning("queued sample rows=%s", sample_rows)
+                except Exception as exc:
+                    logger.warning("failed to fetch queued sample: %s", exc)
+            else:
+                logger.debug("queue empty; no jobs to fetch")
             return None
         job = res.data[0]
-        logger.info("fetched job_id=%s status=%s", job.get("id"), job.get("status"))
+        logger.info(
+            "fetched job_id=%s status=%s created_at=%s",
+            job.get("id"),
+            job.get("status"),
+            job.get("created_at"),
+        )
         return job
 
     def _process_job(self, job: Dict[str, Any], sandbox: Any) -> None:
@@ -242,23 +306,74 @@ class SandboxQueueManager:
             self._mark_failed(job_id, "ANTHROPIC_API_KEY not set")
             return
 
-        try:
-            t0 = time.time()
-            result = generate_and_eval_with_sandbox(
-                sandbox,
-                description=description,
-                dataset_names=self._default_dataset_names(),
-                anthropic_api_key=api_key,
+        forced_class_name = self._generate_class_name(
+            description=description,
+            api_key=api_key,
+        )
+        if not forced_class_name:
+            self._mark_failed(
+                job_id,
+                "Too many models have similar logic. Please submit a new idea.",
             )
-            eval_time = time.time() - t0
-            if eval_time > self.job_timeout_s:
-                self._mark_failed(job_id, "Processing timeout")
-                return
-        except E2BSandboxError as exc:
-            self._mark_failed(job_id, str(exc))
             return
-        except Exception as exc:
-            self._mark_failed(job_id, f"{type(exc).__name__}: {exc}")
+        forced_file_name = self._class_name_to_filename(forced_class_name)
+        forbidden_for_prompt: list[str] = []
+        result = None
+        eval_time = 0.0
+        for attempt in range(2):
+            try:
+                logger.info(
+                    "claude prompt attempt=%s forbidden_names=%s",
+                    attempt + 1,
+                    forbidden_for_prompt,
+                )
+                t0 = time.time()
+                result = generate_and_eval_with_sandbox(
+                    sandbox,
+                    description=description,
+                    dataset_names=self._default_dataset_names(),
+                    anthropic_api_key=api_key,
+                    forbidden_class_names=forbidden_for_prompt,
+                    forced_class_name=forced_class_name,
+                    forced_file_name=forced_file_name,
+                )
+                logger.info(
+                    "claude result attempt=%s class_name=%s file_name=%s",
+                    attempt + 1,
+                    result.get("class_name"),
+                    result.get("file_name"),
+                )
+                eval_time = time.time() - t0
+                if eval_time > self.job_timeout_s:
+                    self._mark_failed(job_id, "Processing timeout")
+                    return
+            except E2BSandboxError as exc:
+                logger.error("sandbox execution failed job_id=%s error=%s", job_id, exc)
+                self._mark_failed(job_id, str(exc))
+                return
+            except Exception as exc:
+                logger.error("sandbox execution error job_id=%s error=%s", job_id, exc)
+                self._mark_failed(job_id, f"{type(exc).__name__}: {exc}")
+                return
+
+            if not result:
+                self._mark_failed(job_id, "Sandbox returned no result.")
+                return
+            class_name = result.get("class_name")
+            if class_name and self._class_name_or_filename_exists(class_name):
+                logger.warning(
+                    "existing class_name=%s detected, retrying",
+                    class_name,
+                )
+                forbidden_for_prompt = list(dict.fromkeys([class_name]))
+                time.sleep(2)
+                continue
+            break
+        if class_name and self._class_name_or_filename_exists(class_name):
+            self._mark_failed(
+                job_id,
+                "Too many models have similar logic. Please submit a new idea.",
+            )
             return
 
         metrics = {k: float(v) for k, v in result.get("metrics", {}).items()}
@@ -266,6 +381,33 @@ class SandboxQueueManager:
         file_name = result.get("file_name") or f"{class_name}.py"
         code_string = result.get("code_string") or ""
         strategy = result.get("strategy") or "E2B Synthesis"
+        if self._class_name_or_filename_exists(class_name):
+            logger.warning(
+                "class_name collision before insert class_name=%s file_name=%s instance=%s",
+                class_name,
+                file_name,
+                self.instance_id,
+            )
+            self._mark_failed(
+                job_id,
+                f"Class name already exists: {class_name}. Please submit a new idea.",
+            )
+            return
+
+        logger.info(
+            "saving algorithm job_id=%s class_name=%s file_name=%s metrics=%s",
+            job_id,
+            class_name,
+            file_name,
+            len(metrics),
+        )
+        logger.info(
+            "db insert prep job_id=%s class_name=%s file_name=%s code_hash=%s",
+            job_id,
+            class_name,
+            file_name,
+            hashlib.sha256(code_string.strip().encode()).hexdigest(),
+        )
 
         db_payload = {
             "user_id": user_id,
@@ -303,13 +445,38 @@ class SandboxQueueManager:
         try:
             db_res = self.supabase.table("algorithms").insert(db_payload).execute()
         except APIError as exc:
-            if exc.args and isinstance(exc.args[0], dict):
-                code = exc.args[0].get("code")
-                details = exc.args[0].get("details", "")
-                if code == "23505" and "code_hash" in details:
-                    self._mark_failed(job_id, "Duplicate model code. Please try again.")
-                    return
-            self._mark_failed(job_id, "Database error while saving results.")
+            api_error = exc.args[0] if exc.args and isinstance(exc.args[0], dict) else {}
+            code = api_error.get("code")
+            details = api_error.get("details", "")
+            message = api_error.get("message")
+            if not message:
+                message = str(exc) or "Database error while saving results."
+            logger.error(
+                "database insert failed job_id=%s code=%s message=%s details=%s",
+                job_id,
+                code,
+                message,
+                details,
+            )
+            if code == "23505" and "code_hash" in details:
+                existing = (
+                    self.supabase.table("algorithms")
+                    .select("class_name")
+                    .eq("code_hash", db_payload["code_hash"])
+                    .limit(1)
+                    .execute()
+                )
+                existing_name = None
+                if existing.data:
+                    existing_name = existing.data[0].get("class_name")
+                if existing_name:
+                    self._mark_failed(job_id, f"Model already exists: {existing_name}.")
+                else:
+                    self._mark_failed(job_id, "Model with identical code already exists.")
+                return
+            detail_text = f" Details: {details}" if details else ""
+            code_text = f"{code}" if code else "unknown"
+            self._mark_failed(job_id, f"Database error ({code_text}): {message}.{detail_text}")
             return
         algorithm_id = db_res.data[0]["id"] if db_res.data else None
         try:
@@ -335,10 +502,18 @@ class SandboxQueueManager:
                 lambda: self.supabase.table(self.queue_table).update(payload).eq("id", job_id).execute(),
                 "update_job",
             )
+            if "status" in payload:
+                logger.info(
+                    "job update job_id=%s status=%s instance=%s",
+                    job_id,
+                    payload.get("status"),
+                    self.instance_id,
+                )
         except Exception as exc:
             logger.error("Failed to update job_id=%s: %s", job_id, exc)
 
     def _mark_failed(self, job_id: str, error: str) -> None:
+        logger.warning("job failed job_id=%s error=%s", job_id, error)
         self._update_job(
             job_id,
             {"status": "failed", "error": error, "finished_at": datetime.utcnow().isoformat()},
@@ -404,6 +579,7 @@ class SandboxQueueManager:
 
     def _claim_job(self, job_id: str, started_at: str) -> bool:
         try:
+            logger.info("claim attempt job_id=%s started_at=%s", job_id, started_at)
             res = self._execute_with_retry(
                 lambda: self.supabase.table(self.queue_table)
                 .update({"status": "processing", "started_at": started_at})
@@ -412,6 +588,7 @@ class SandboxQueueManager:
                 .execute(),
                 "claim_job",
             )
+            logger.info("claim result job_id=%s rows=%s", job_id, len(res.data or []))
             return bool(res.data)
         except Exception as exc:
             logger.error("Failed to claim job_id=%s: %s", job_id, exc)
@@ -464,3 +641,90 @@ class SandboxQueueManager:
             return user_id
         except ValueError:
             return None
+
+    def _class_name_or_filename_exists(self, class_name: str) -> bool:
+        if not class_name:
+            return False
+        normalized = class_name.strip()
+        file_name = self._class_name_to_filename(normalized)
+        res = self._execute_with_retry(
+            lambda: self.supabase.table("algorithms")
+            .select("id, class_name, file_name")
+            .eq("class_name", normalized)
+            .limit(1)
+            .execute(),
+            "class_name_exists",
+        )
+        if res.data:
+            logger.debug(
+                "class_name exists: requested=%s matched=%s",
+                normalized,
+                res.data[0],
+            )
+            return True
+        res = self._execute_with_retry(
+            lambda: self.supabase.table("algorithms")
+            .select("id, class_name, file_name")
+            .eq("file_name", file_name)
+            .limit(1)
+            .execute(),
+            "file_name_exists",
+        )
+        if res.data:
+            logger.debug(
+                "file_name exists: requested=%s matched=%s",
+                file_name,
+                res.data[0],
+            )
+        return bool(res.data)
+
+    def _generate_class_name(self, description: str, api_key: str) -> Optional[str]:
+        if not api_key:
+            return None
+        client = anthropic.Anthropic(api_key=api_key)
+        forbidden: list[str] = []
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                logger.info("class name generation attempt=%s forbidden=%s", attempt + 1, forbidden)
+                prompt = (
+                    "Generate a succinct pythonic class name for the following model description.\n"
+                    "Return ONLY the class name, no extra text.\n"
+                    f"Description: {description}\n"
+                    f"Avoid using any of these class names: {', '.join(forbidden) if forbidden else 'None'}\n"
+                )
+                message = client.messages.create(
+                    model="claude-sonnet-4-5-20250929",
+                    max_tokens=128,
+                    temperature=0,
+                    system="Return only a valid python class name.",
+                    messages=[{"role": "user", "content": [{"type": "text", "text": prompt}]}],
+                )
+                name = message.content[0].text.strip()
+                if not name:
+                    continue
+                name = name.split()[0].strip()
+                exists = self._class_name_or_filename_exists(name)
+                logger.info("class name candidate=%s exists=%s", name, exists)
+                if exists:
+                    logger.warning("local class name collision detected: %s", name)
+                    forbidden.append(name)
+                    continue
+                logger.info("local class name selected: %s", name)
+                return name
+            except (InternalServerError, APIConnectionError, RateLimitError, APIStatusError) as exc:
+                if attempt == max_retries - 1:
+                    logger.error("class name generation failed: %s", exc)
+                    return None
+                time.sleep(1.5 * (attempt + 1))
+        return None
+
+    def _class_name_to_filename(self, class_name: str) -> str:
+        if not class_name:
+            return "generated_model.py"
+        filename = []
+        for idx, ch in enumerate(class_name):
+            if ch.isupper() and idx > 0:
+                filename.append("_")
+            filename.append(ch.lower())
+        return "".join(filename) + ".py"

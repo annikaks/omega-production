@@ -206,9 +206,12 @@ print("{class_name}", accuracy)
             with open(init_file_path, 'w') as file:
                 file.writelines(new_lines)
 
-    def genML(self, model: str):
+    def genML(self, model: str, forbidden_names=None):
         metaomni_dir = GENERATION_DIRECTORY_PATH
         os.makedirs(metaomni_dir, exist_ok=True)
+        forbidden_names = forbidden_names or []
+        forbidden_names = [name for name in forbidden_names if isinstance(name, str)]
+        forbidden_names = forbidden_names[:50]
         
         # SPEED OPTIMIZATION: Combine Naming and Coding into 1 prompt
         mega_prompt = f"""
@@ -226,6 +229,7 @@ print("{class_name}", accuracy)
                 # All arguments must be saved as attributes
 
         The class must implement fit(self, X_train, y_train) and predict(self, X_test).
+        Avoid using any of these class names if provided: {", ".join(forbidden_names) if forbidden_names else "None"}.
         Only return the tags and the code block.
         """
         response = self.gen(mega_prompt)
@@ -251,9 +255,14 @@ print("{class_name}", accuracy)
                 self.remove_import_from_init(init_file_path, import_string)
         return None
 
-    def parallel_genML(self, prompt_list):
+    def parallel_genML(self, prompt_list, forbidden_names=None):
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            return list(tqdm(executor.map(self.genML, prompt_list), total=len(prompt_list)))
+            return list(
+                tqdm(
+                    executor.map(lambda p: self.genML(p, forbidden_names=forbidden_names), prompt_list),
+                    total=len(prompt_list),
+                )
+            )
 
 # NOTE (V.S) : Not sure what to do with this
 # The directory has been generated already which is why the call is commented

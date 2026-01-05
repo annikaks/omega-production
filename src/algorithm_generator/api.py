@@ -30,7 +30,7 @@ from scoring import fetch_bounds_from_supabase, recompute_min_max_scores
 from sandbox_queue import SandboxQueueManager
 
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 URL = os.getenv("SUPABASE_URL")

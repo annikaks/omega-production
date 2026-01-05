@@ -1,11 +1,14 @@
 import json
+import logging
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from dotenv import load_dotenv
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 class E2BSandboxError(RuntimeError):
     pass
@@ -100,7 +103,26 @@ def _run_python_in_sandbox(sandbox: Any, code: str) -> Tuple[str, str]:
 def _write_sandbox_file(sandbox: Any, path: str, content: str) -> None:
     if not hasattr(sandbox, "files"):
         raise E2BSandboxError("Sandbox filesystem API not available.")
-    sandbox.files.write(path, content)
+    max_attempts = 3
+    delay_s = 0.5
+    for attempt in range(1, max_attempts + 1):
+        try:
+            sandbox.files.write(path, content)
+            return
+        except Exception as exc:
+            logger.warning(
+                "sandbox file upload failed path=%s attempt=%s/%s error=%s",
+                path,
+                attempt,
+                max_attempts,
+                exc,
+            )
+            if attempt >= max_attempts:
+                raise E2BSandboxError(
+                    "Sandbox file upload failed. Please retry."
+                ) from exc
+            time.sleep(delay_s)
+            delay_s *= 2
 
 
 def create_e2b_sandbox() -> Any:
@@ -346,6 +368,13 @@ try:
     description = payload["description"]
     dataset_names = payload["dataset_names"]
     api_key = payload["anthropic_api_key"]
+    forbidden = payload.get("forbidden_class_names") or []
+    forced_class_name = payload.get("forced_class_name")
+    forced_file_name = payload.get("forced_file_name")
+    if not isinstance(forbidden, list):
+        forbidden = []
+    forbidden = [name for name in forbidden if isinstance(name, str)]
+    forbidden = forbidden[:50]
 
     client = anthropic.Anthropic(api_key=api_key)
     mega_prompt = f\"\"\"
@@ -363,6 +392,9 @@ try:
             # All arguments must be saved as attributes
 
     The class must implement fit(self, X_train, y_train) and predict(self, X_test).
+    Use this exact class name if provided: {forced_class_name or "None"}.
+    Use this exact file name if provided: {forced_file_name or "None"}.
+    Avoid using any of these class names if provided: {", ".join(forbidden) if forbidden else "None"}.
     Only return the tags and the code block.
     \"\"\"
     message = client.messages.create(
@@ -378,6 +410,17 @@ try:
     file_name = re.search(r"<file_name>(.*?)</file_name>", response, re.DOTALL).group(1).strip()
     snippets = re.findall(r"```(?:python)?\\n(.*?)```", response, re.DOTALL)
     code_string = snippets[0].strip() if snippets else ""
+    if forced_class_name:
+        class_name = forced_class_name
+        if code_string:
+            code_string = re.sub(
+                r"class\\s+\\w+\\s*\\(",
+                f"class {forced_class_name}(",
+                code_string,
+                count=1,
+            )
+    if forced_file_name:
+        file_name = forced_file_name
 
     cached, missing = _load_cached(dataset_names)
     datasets = cached
@@ -427,11 +470,17 @@ def run_e2b_generate_and_eval(
     description: str,
     dataset_names: List[str],
     anthropic_api_key: str,
+    forbidden_class_names: List[str] | None = None,
+    forced_class_name: str | None = None,
+    forced_file_name: str | None = None,
 ) -> Dict[str, Any]:
     payload = {
         "description": description,
         "dataset_names": dataset_names,
         "anthropic_api_key": anthropic_api_key,
+        "forbidden_class_names": forbidden_class_names or [],
+        "forced_class_name": forced_class_name,
+        "forced_file_name": forced_file_name,
     }
 
     payload_json = json.dumps(payload)
@@ -474,11 +523,17 @@ def generate_and_eval_with_sandbox(
     description: str,
     dataset_names: List[str],
     anthropic_api_key: str,
+    forbidden_class_names: List[str] | None = None,
+    forced_class_name: str | None = None,
+    forced_file_name: str | None = None,
 ) -> Dict[str, Any]:
     payload = {
         "description": description,
         "dataset_names": dataset_names,
         "anthropic_api_key": anthropic_api_key,
+        "forbidden_class_names": forbidden_class_names or [],
+        "forced_class_name": forced_class_name,
+        "forced_file_name": forced_file_name,
     }
     payload_json = json.dumps(payload)
     data_loader_path = Path(__file__).resolve().parent / "data_loader.py"
