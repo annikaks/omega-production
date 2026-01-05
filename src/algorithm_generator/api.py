@@ -2,16 +2,18 @@ import os
 import uuid
 import json
 import time
+import difflib
 import importlib.util
 import traceback
 import hashlib
 import logging
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -76,10 +78,11 @@ def startup_event():
         )
         queue_manager.start()
         logger.info(
-            "sandbox queue manager started (pool_size=%s, queue_limit=%s, workers=%s)",
+            "sandbox queue manager started (pool_size=%s, queue_limit=%s, workers=%s, instance=%s)",
             pool_size,
             queue_limit,
             worker_count,
+            queue_manager.instance_id,
         )
 
 @app.get("/config")
@@ -94,6 +97,31 @@ class SynthesisRequest(BaseModel):
     description: str
     user_id: str
     creator_name: str
+
+def _fetch_existing_class_names() -> list[str]:
+    res = supabase.table("algorithms").select("class_name").execute()
+    names = []
+    for row in res.data or []:
+        name = row.get("class_name")
+        if isinstance(name, str):
+            names.append(name)
+    return names
+
+
+def _find_similar_names(target: str, candidates: list[str], limit: int = 12, threshold: float = 0.8) -> list[str]:
+    if not target:
+        return []
+    target_lower = target.lower()
+    scored = []
+    for name in candidates:
+        if not isinstance(name, str):
+            continue
+        ratio = difflib.SequenceMatcher(None, target_lower, name.lower()).ratio()
+        if ratio >= threshold:
+            scored.append((ratio, name))
+    scored.sort(reverse=True)
+    return [name for _ratio, name in scored[:limit]]
+
 
 def eval_single_ds(args):
     logger.debug("eval_single_ds called")
@@ -143,8 +171,21 @@ async def handle_synthesis(req: SynthesisRequest):
             }
         else:
             logger.info("handle_synthesis using local ProcessPoolExecutor for evaluation")
-            gen_result = algo_gen.parallel_genML([req.description])
-            fname, cname, strategy = gen_result[0]
+            existing_names = _fetch_existing_class_names()
+            fname = cname = strategy = None
+            forbidden = []
+            for attempt in range(2):
+                gen_result = algo_gen.parallel_genML([req.description], forbidden_names=forbidden)
+                fname, cname, strategy = gen_result[0]
+                similar = _find_similar_names(cname or "", existing_names)
+                if cname and cname not in existing_names and not similar:
+                    break
+                forbidden = list(dict.fromkeys(similar + ([cname] if cname else [])))
+            if cname in existing_names or _find_similar_names(cname or "", existing_names):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Generated class name already exists or is too similar. Please try again.",
+                )
             file_path = os.path.join(GENERATION_DIRECTORY_PATH, fname)
             with open(file_path, "r") as f:
                 code_string = f.read()
@@ -238,6 +279,52 @@ def get_leaderboard():
     
     return {"ranked_list": user_models}
 
+@app.get("/leaderboard-history")
+def get_leaderboard_history():
+    logger.info("get_leaderboard_history called")
+    res = (
+        supabase.table("algorithms")
+        .select("id, class_name, aggregate_acc, min_max_score, creator_name, user_prompt, created_at")
+        .execute()
+    )
+    rows = res.data or []
+    parsed = []
+    for row in rows:
+        created_at = row.get("created_at")
+        created_dt = None
+        if isinstance(created_at, str):
+            try:
+                created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            except ValueError:
+                created_dt = None
+        parsed.append({**row, "_created_at_dt": created_dt})
+
+    now = datetime.now(timezone.utc)
+    days = []
+    for offset in range(7):
+        day = (now - timedelta(days=offset)).date()
+        day_end = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
+        candidates = [
+            row for row in parsed
+            if row["_created_at_dt"] is not None and row["_created_at_dt"] < day_end
+        ]
+        candidates.sort(key=lambda r: (r.get("min_max_score") or 0.0), reverse=True)
+        top = candidates[:10]
+        ranked_list = []
+        for row in top:
+            ranked_list.append({
+                "id": row["id"],
+                "name": row["class_name"],
+                "raw_acc": row.get("aggregate_acc"),
+                "display_acc": row.get("min_max_score"),
+                "creator_name": row.get("creator_name"),
+                "user_prompt": row.get("user_prompt"),
+                "created_at": row.get("created_at"),
+            })
+        days.append({"date": day.isoformat(), "ranked_list": ranked_list})
+
+    return {"days": days}
+
 @app.get("/dataset-stats")
 def get_dataset_stats():
     logger.info("get_dataset_stats called")
@@ -269,6 +356,23 @@ async def get_summary(model_id: str):
         return {"summary": summary}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/algorithm-code/{model_id}")
+def get_algorithm_code(model_id: str):
+    logger.info("get_algorithm_code called for model_id=%s", model_id)
+    res = (
+        supabase.table("algorithms")
+        .select("class_name, file_name, algorithm_code")
+        .eq("id", model_id)
+        .single()
+        .execute()
+    )
+    if not res.data or not res.data.get("algorithm_code"):
+        raise HTTPException(status_code=404, detail="Algorithm code not found")
+    class_name = res.data.get("class_name") or "model"
+    filename = res.data.get("file_name") or f"{class_name}.py"
+    headers = {"Content-Disposition": f"attachment; filename=\"{filename}\""}
+    return Response(res.data["algorithm_code"], media_type="text/plain; charset=utf-8", headers=headers)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)
