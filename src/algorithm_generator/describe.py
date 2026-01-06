@@ -6,6 +6,14 @@ class ModelAnalyzer:
     def __init__(self, anthropic_client: anthropic.Anthropic):
         self.anthropic_client = anthropic_client
 
+    def describe_code(self, code: str):
+        if not code:
+            return "Error: Empty code"
+        try:
+            return self.llm_api_call(code, batch=False)
+        except Exception as e:
+            return f"Error generating description ({e})"
+
     def analyze_repo(self, dir_path, output_file="model_summaries.txt"):
         all_files_content = []
         print(f"Analyzing repository at: {dir_path}")
