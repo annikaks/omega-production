@@ -15,9 +15,9 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "numpy",
-    "scikit-learn",
-    "scipy",
+    "numpy<2.0",
+    "scikit-learn<1.8",
+    "scipy<1.17",
 ]
 
 [tool.setuptools]
