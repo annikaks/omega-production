@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "omega-models"
-version = "0.3.1"
+version = "0.3.2"
 description = "A collection of generated machine learning algorithms"
 readme = "README_PYPI.md"
 authors = [{ name = "Annika Singh", email = "annikas@infinity.inc" }]
