@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "omega-models"
-version = "0.2.3"
+version = "0.3.1"
 description = "A collection of generated machine learning algorithms"
 readme = "README_PYPI.md"
 authors = [{ name = "Annika Singh", email = "annikas@infinity.inc" }]
-requires-python = ">=3.11"
+requires-python = ">=3.6"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
