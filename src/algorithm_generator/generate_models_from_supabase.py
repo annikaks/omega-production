@@ -189,47 +189,56 @@ def main() -> None:
             if not prompt_id:
                 continue
             for client in clients:
-                if _prompt_done(supabase, prompt_id, client.name):
+                try:
+                    if _prompt_done(supabase, prompt_id, client.name):
+                        logger.info(
+                            "skipping existing generation | prompt_id=%s llm=%s",
+                            prompt_id,
+                            client.name,
+                        )
+                        continue
+                    prompt = _build_model_prompt(model_family, prompt_text)
+                    logger.info("generating model | prompt_id=%s llm=%s", prompt_id, client.name)
+                    response = client.generate(prompt)
+                    class_name = _extract_tag(response, "class_name")
+                    file_name = _extract_tag(response, "file_name")
+                    code = _extract_code_snippet(response)
+                    if not class_name or not code:
+                        logger.warning("missing code/class | prompt_id=%s llm=%s", prompt_id, client.name)
+                        continue
                     logger.info(
-                        "skipping existing generation | prompt_id=%s llm=%s",
+                        "evaluating in e2b | prompt_id=%s llm=%s class=%s",
                         prompt_id,
                         client.name,
-                    )
-                    continue
-                prompt = _build_model_prompt(model_family, prompt_text)
-                logger.info("generating model | prompt_id=%s llm=%s", prompt_id, client.name)
-                response = client.generate(prompt)
-                class_name = _extract_tag(response, "class_name")
-                file_name = _extract_tag(response, "file_name")
-                code = _extract_code_snippet(response)
-                if not class_name or not code:
-                    logger.warning("missing code/class | prompt_id=%s llm=%s", prompt_id, client.name)
-                    continue
-                logger.info(
-                    "evaluating in e2b | prompt_id=%s llm=%s class=%s",
-                    prompt_id,
-                    client.name,
-                    class_name,
-                )
-                try:
-                    metrics, eval_time = _evaluate_code_with_e2b(
-                        sandbox,
-                        code,
                         class_name,
-                        dataset_names,
                     )
-                except E2BSandboxError as exc:
+                    try:
+                        metrics, eval_time = _evaluate_code_with_e2b(
+                            sandbox,
+                            code,
+                            class_name,
+                            dataset_names,
+                        )
+                    except E2BSandboxError as exc:
+                        logger.error(
+                            "e2b evaluation failed | prompt_id=%s llm=%s error=%s",
+                            prompt_id,
+                            client.name,
+                            exc,
+                        )
+                        continue
+                    payload = _build_payload(row, client.name, class_name, file_name, code, metrics, eval_time)
+                    supabase.table(MODEL_TABLE).insert(payload).execute()
+                    inserted += 1
+                    logger.info("saved model | prompt_id=%s llm=%s class=%s", prompt_id, client.name, class_name)
+                except Exception as exc:
                     logger.error(
-                        "e2b evaluation failed | prompt_id=%s llm=%s error=%s",
+                        "generation failed | prompt_id=%s llm=%s error=%s",
                         prompt_id,
                         client.name,
                         exc,
                     )
                     continue
-                payload = _build_payload(row, client.name, class_name, file_name, code, metrics, eval_time)
-                supabase.table(MODEL_TABLE).insert(payload).execute()
-                inserted += 1
-                logger.info("saved model | prompt_id=%s llm=%s class=%s", prompt_id, client.name, class_name)
     finally:
         close_e2b_sandbox(sandbox)
 
