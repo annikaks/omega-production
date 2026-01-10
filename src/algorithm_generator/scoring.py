@@ -78,3 +78,21 @@ def recompute_min_max_scores(supabase) -> Dict[str, Dict[str, float]]:
         score = calculate_min_max_score(metrics, bounds)
         supabase.table("algorithms").update({"min_max_score": score}).eq("id", row["id"]).execute()
     return bounds
+
+
+def recompute_min_max_scores_for_table(
+    supabase,
+    table_name: str,
+) -> Dict[str, Dict[str, float]]:
+    columns = ",".join(["id"] + [column for _dataset, column in DATASET_COLUMNS])
+    res = supabase.table(table_name).select(columns).execute()
+    rows = res.data or []
+    bounds = compute_bounds_from_rows(rows)
+    for row in rows:
+        metrics = {
+            dataset: _coerce_float(row.get(column))
+            for dataset, column in DATASET_COLUMNS
+        }
+        score = calculate_min_max_score(metrics, bounds)
+        supabase.table(table_name).update({"min_max_score": score}).eq("id", row["id"]).execute()
+    return bounds
