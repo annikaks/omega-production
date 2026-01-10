@@ -158,7 +158,14 @@ def _build_payload(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate models from Supabase prompts.")
     parser.add_argument("--llms", default="gemini,claude,openai,groq", help="comma-separated LLMs")
+    parser.add_argument("--shard-count", type=int, default=1, help="total number of shards")
+    parser.add_argument("--shard-index", type=int, default=0, help="zero-based shard index")
     args = parser.parse_args()
+
+    if args.shard_count < 1:
+        raise ValueError("--shard-count must be >= 1")
+    if args.shard_index < 0 or args.shard_index >= args.shard_count:
+        raise ValueError("--shard-index must be in [0, shard-count)")
 
     supabase = _get_supabase()
     available_clients = build_llm_clients()
@@ -173,7 +180,9 @@ def main() -> None:
     sandbox = create_e2b_sandbox()
     inserted = 0
     try:
-        for row in prompt_rows:
+        for idx, row in enumerate(prompt_rows):
+            if args.shard_count > 1 and (idx % args.shard_count) != args.shard_index:
+                continue
             model_family = row.get("model_family") or "classifier"
             prompt_text = row.get("prompt_text") or ""
             prompt_id = row.get("id")
