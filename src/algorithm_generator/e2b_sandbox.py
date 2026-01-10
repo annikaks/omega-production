@@ -153,8 +153,7 @@ def _extract_result(stdout: str) -> Dict[str, Any]:
 
 
 def _build_eval_runner(tmp_dir: str) -> str:
-    tmp_literal = repr(tmp_dir)
-    return f"""
+    runner = """
 import json
 import sys
 import traceback
@@ -196,8 +195,8 @@ try:
                 missing.append(name)
         return cached, missing
 
-    TMP_DIR = {tmp_literal}
-    payload = json.loads(open(f"{{TMP_DIR}}/payload.json", "r").read())
+    TMP_DIR = "__TMP_DIR__"
+    payload = json.loads(open(f"{TMP_DIR}/payload.json", "r").read())
     code_string = payload["code"]
     class_name = payload["class_name"]
     dataset_names = payload["dataset_names"]
@@ -209,7 +208,7 @@ try:
     cached, missing = _load_cached(dataset_names)
     datasets = cached
     if missing:
-        spec = importlib.util.spec_from_file_location("data_loader", f"{{TMP_DIR}}/data_loader.py")
+        spec = importlib.util.spec_from_file_location("data_loader", f"{TMP_DIR}/data_loader.py")
         data_loader = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(data_loader)
         datasets.update(data_loader.load_classification_datasets(missing))
@@ -232,8 +231,9 @@ try:
 
     print(json.dumps({"metrics": metrics}))
 except Exception as exc:
-    print(json.dumps({{"metrics": {{}}, "error": f"{{type(exc).__name__}}: {{exc}}"}}))
+    print(json.dumps({"metrics": {}, "error": f"{type(exc).__name__}: {exc}"}))
 """
+    return runner.replace("\"__TMP_DIR__\"", repr(tmp_dir))
 
 
 def run_e2b_eval(
@@ -326,8 +326,7 @@ def eval_with_sandbox(
 
 
 def _build_generate_runner(tmp_dir: str) -> str:
-    tmp_literal = repr(tmp_dir)
-    return f"""
+    runner = """
 import json
 import re
 import sys
@@ -377,8 +376,8 @@ try:
                 missing.append(name)
         return cached, missing
 
-    TMP_DIR = {tmp_literal}
-    payload = json.loads(open(f"{{TMP_DIR}}/payload.json", "r").read())
+    TMP_DIR = "__TMP_DIR__"
+    payload = json.loads(open(f"{TMP_DIR}/payload.json", "r").read())
     description = payload["description"]
     dataset_names = payload["dataset_names"]
     api_key = payload["anthropic_api_key"]
@@ -439,7 +438,7 @@ try:
     cached, missing = _load_cached(dataset_names)
     datasets = cached
     if missing:
-        spec = importlib.util.spec_from_file_location("data_loader", f"{{TMP_DIR}}/data_loader.py")
+        spec = importlib.util.spec_from_file_location("data_loader", f"{TMP_DIR}/data_loader.py")
         data_loader = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(data_loader)
         datasets.update(data_loader.load_classification_datasets(missing))
@@ -476,8 +475,9 @@ try:
         )
     )
 except Exception as exc:
-    print(json.dumps({{"metrics": {{}}, "error": f"{{type(exc).__name__}}: {{exc}}"}}))
+    print(json.dumps({"metrics": {}, "error": f"{type(exc).__name__}: {exc}"}))
 """
+    return runner.replace("\"__TMP_DIR__\"", repr(tmp_dir))
 
 
 def run_e2b_generate_and_eval(
