@@ -125,6 +125,11 @@ def _write_sandbox_file(sandbox: Any, path: str, content: str) -> None:
             delay_s *= 2
 
 
+def _sandbox_tmp_dir() -> str:
+    tmp_dir = os.getenv("E2B_TMP_DIR", "/tmp").strip()
+    return tmp_dir.rstrip("/") or "/tmp"
+
+
 def create_e2b_sandbox() -> Any:
     Sandbox = _load_sandbox_class()
     return _create_sandbox(Sandbox)
@@ -147,8 +152,9 @@ def _extract_result(stdout: str) -> Dict[str, Any]:
     raise E2BSandboxError("Failed to parse E2B sandbox output.")
 
 
-def _build_eval_runner() -> str:
-    return """
+def _build_eval_runner(tmp_dir: str) -> str:
+    tmp_literal = repr(tmp_dir)
+    return f"""
 import json
 import sys
 import traceback
@@ -190,7 +196,8 @@ try:
                 missing.append(name)
         return cached, missing
 
-    payload = json.loads(open("/tmp/payload.json", "r").read())
+    TMP_DIR = {tmp_literal}
+    payload = json.loads(open(f"{{TMP_DIR}}/payload.json", "r").read())
     code_string = payload["code"]
     class_name = payload["class_name"]
     dataset_names = payload["dataset_names"]
@@ -202,7 +209,7 @@ try:
     cached, missing = _load_cached(dataset_names)
     datasets = cached
     if missing:
-        spec = importlib.util.spec_from_file_location("data_loader", "/tmp/data_loader.py")
+        spec = importlib.util.spec_from_file_location("data_loader", f"{{TMP_DIR}}/data_loader.py")
         data_loader = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(data_loader)
         datasets.update(data_loader.load_classification_datasets(missing))
@@ -225,7 +232,7 @@ try:
 
     print(json.dumps({"metrics": metrics}))
 except Exception as exc:
-    print(json.dumps({"metrics": {}, "error": f"{type(exc).__name__}: {exc}"}))
+    print(json.dumps({{"metrics": {{}}, "error": f"{{type(exc).__name__}}: {{exc}}"}}))
 """
 
 
@@ -239,11 +246,12 @@ def run_e2b_eval(
     }
 
     payload_json = json.dumps(payload)
+    tmp_dir = _sandbox_tmp_dir()
     data_loader_path = Path(__file__).resolve().parent / "data_loader.py"
     if not data_loader_path.exists():
         raise E2BSandboxError("data_loader.py not found for sandbox upload.")
     data_loader_code = data_loader_path.read_text()
-    runner = _build_eval_runner()
+    runner = _build_eval_runner(tmp_dir)
 
     sandbox = create_e2b_sandbox()
     try:
@@ -252,6 +260,7 @@ def run_e2b_eval(
             payload_json,
             data_loader_code,
             runner,
+            tmp_dir,
         )
     finally:
         close_e2b_sandbox(sandbox)
@@ -274,9 +283,10 @@ def run_e2b_eval_in_sandbox(
     payload_json: str,
     data_loader_code: str,
     runner: str,
+    tmp_dir: str,
 ) -> Tuple[str, str]:
-    _write_sandbox_file(sandbox, "/tmp/payload.json", payload_json)
-    _write_sandbox_file(sandbox, "/tmp/data_loader.py", data_loader_code)
+    _write_sandbox_file(sandbox, f"{tmp_dir}/payload.json", payload_json)
+    _write_sandbox_file(sandbox, f"{tmp_dir}/data_loader.py", data_loader_code)
     return _run_python_in_sandbox(sandbox, runner)
 
 
@@ -292,17 +302,19 @@ def eval_with_sandbox(
         "dataset_names": dataset_names,
     }
     payload_json = json.dumps(payload)
+    tmp_dir = _sandbox_tmp_dir()
     data_loader_path = Path(__file__).resolve().parent / "data_loader.py"
     if not data_loader_path.exists():
         raise E2BSandboxError("data_loader.py not found for sandbox upload.")
     data_loader_code = data_loader_path.read_text()
-    runner = _build_eval_runner()
+    runner = _build_eval_runner(tmp_dir)
 
     stdout, _stderr = run_e2b_eval_in_sandbox(
         sandbox,
         payload_json,
         data_loader_code,
         runner,
+        tmp_dir,
     )
     result = _extract_result(stdout)
     if "error" in result:
@@ -313,8 +325,9 @@ def eval_with_sandbox(
     return {k: float(v) for k, v in metrics.items()}
 
 
-def _build_generate_runner() -> str:
-    return """
+def _build_generate_runner(tmp_dir: str) -> str:
+    tmp_literal = repr(tmp_dir)
+    return f"""
 import json
 import re
 import sys
@@ -364,7 +377,8 @@ try:
                 missing.append(name)
         return cached, missing
 
-    payload = json.loads(open("/tmp/payload.json", "r").read())
+    TMP_DIR = {tmp_literal}
+    payload = json.loads(open(f"{{TMP_DIR}}/payload.json", "r").read())
     description = payload["description"]
     dataset_names = payload["dataset_names"]
     api_key = payload["anthropic_api_key"]
@@ -425,7 +439,7 @@ try:
     cached, missing = _load_cached(dataset_names)
     datasets = cached
     if missing:
-        spec = importlib.util.spec_from_file_location("data_loader", "/tmp/data_loader.py")
+        spec = importlib.util.spec_from_file_location("data_loader", f"{{TMP_DIR}}/data_loader.py")
         data_loader = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(data_loader)
         datasets.update(data_loader.load_classification_datasets(missing))
@@ -462,7 +476,7 @@ try:
         )
     )
 except Exception as exc:
-    print(json.dumps({"metrics": {}, "error": f"{type(exc).__name__}: {exc}"}))
+    print(json.dumps({{"metrics": {{}}, "error": f"{{type(exc).__name__}}: {{exc}}"}}))
 """
 
 
@@ -484,11 +498,12 @@ def run_e2b_generate_and_eval(
     }
 
     payload_json = json.dumps(payload)
+    tmp_dir = _sandbox_tmp_dir()
     data_loader_path = Path(__file__).resolve().parent / "data_loader.py"
     if not data_loader_path.exists():
         raise E2BSandboxError("data_loader.py not found for sandbox upload.")
     data_loader_code = data_loader_path.read_text()
-    runner = _build_generate_runner()
+    runner = _build_generate_runner(tmp_dir)
 
     sandbox = create_e2b_sandbox()
     try:
@@ -497,6 +512,7 @@ def run_e2b_generate_and_eval(
             payload_json,
             data_loader_code,
             runner,
+            tmp_dir,
         )
     finally:
         close_e2b_sandbox(sandbox)
@@ -512,9 +528,10 @@ def run_e2b_generate_and_eval_in_sandbox(
     payload_json: str,
     data_loader_code: str,
     runner: str,
+    tmp_dir: str,
 ) -> Tuple[str, str]:
-    _write_sandbox_file(sandbox, "/tmp/payload.json", payload_json)
-    _write_sandbox_file(sandbox, "/tmp/data_loader.py", data_loader_code)
+    _write_sandbox_file(sandbox, f"{tmp_dir}/payload.json", payload_json)
+    _write_sandbox_file(sandbox, f"{tmp_dir}/data_loader.py", data_loader_code)
     return _run_python_in_sandbox(sandbox, runner)
 
 
@@ -536,17 +553,19 @@ def generate_and_eval_with_sandbox(
         "forced_file_name": forced_file_name,
     }
     payload_json = json.dumps(payload)
+    tmp_dir = _sandbox_tmp_dir()
     data_loader_path = Path(__file__).resolve().parent / "data_loader.py"
     if not data_loader_path.exists():
         raise E2BSandboxError("data_loader.py not found for sandbox upload.")
     data_loader_code = data_loader_path.read_text()
-    runner = _build_generate_runner()
+    runner = _build_generate_runner(tmp_dir)
 
     stdout, _stderr = run_e2b_generate_and_eval_in_sandbox(
         sandbox,
         payload_json,
         data_loader_code,
         runner,
+        tmp_dir,
     )
     result = _extract_result(stdout)
     if "error" in result:
