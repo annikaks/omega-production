@@ -1,9 +1,12 @@
 import os
+import time
+import logging
 from dataclasses import dataclass
 from typing import Dict
 
 import anthropic
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class LLMClient:
@@ -80,12 +83,28 @@ class GroqClient(LLMClient):
         self.model = model
 
     def generate(self, prompt: str) -> str:
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-        )
-        return response.choices[0].message.content or ""
+        max_retries = 5
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0,
+                )
+                return response.choices[0].message.content or ""
+            except Exception as exc:
+                if attempt >= max_retries:
+                    logger.error("groq failed after %s attempts: %s", attempt, exc)
+                    raise
+                wait_s = 1.5 * attempt
+                logger.warning(
+                    "groq request failed (attempt %s/%s): %s; retrying in %.1fs",
+                    attempt,
+                    max_retries,
+                    exc,
+                    wait_s,
+                )
+                time.sleep(wait_s)
 
 
 def build_llm_clients() -> Dict[str, LLMClient]:
