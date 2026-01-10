@@ -2,7 +2,9 @@ import argparse
 import hashlib
 import logging
 import os
+import queue
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -165,37 +167,65 @@ def main() -> None:
     parser.add_argument("--llms", default="gemini,claude,openai,groq", help="comma-separated LLMs")
     parser.add_argument("--shard-count", type=int, default=1, help="total number of shards")
     parser.add_argument("--shard-index", type=int, default=0, help="zero-based shard index")
+    parser.add_argument("--workers", type=int, default=1, help="parallel workers for evaluation")
     args = parser.parse_args()
 
     if args.shard_count < 1:
         raise ValueError("--shard-count must be >= 1")
     if args.shard_index < 0 or args.shard_index >= args.shard_count:
         raise ValueError("--shard-index must be in [0, shard-count)")
+    if args.workers < 1:
+        raise ValueError("--workers must be >= 1")
 
     supabase = _get_supabase()
     available_clients = build_llm_clients()
     llm_names = [name.strip() for name in args.llms.split(",") if name.strip()]
-    clients = _resolve_clients(llm_names, available_clients)
+    _resolve_clients(llm_names, available_clients)
 
     dataset_names = _default_dataset_names()
     prompt_res = supabase.table(PROMPT_TABLE).select("*").execute()
     prompt_rows = prompt_res.data or []
     logger.info("loaded prompts | count=%s", len(prompt_rows))
 
-    sandbox = create_e2b_sandbox()
     inserted = 0
-    try:
-        for idx, row in enumerate(prompt_rows):
-            if args.shard_count > 1 and (idx % args.shard_count) != args.shard_index:
-                continue
-            model_family = row.get("model_family") or "classifier"
-            prompt_text = row.get("prompt_text") or ""
-            prompt_id = row.get("id")
-            if not prompt_id:
-                continue
-            for client in clients:
+    inserted_lock = threading.Lock()
+    task_queue: queue.Queue[tuple[dict, str] | None] = queue.Queue()
+
+    for idx, row in enumerate(prompt_rows):
+        if args.shard_count > 1 and (idx % args.shard_count) != args.shard_index:
+            continue
+        prompt_id = row.get("id")
+        if not prompt_id:
+            continue
+        for llm_name in llm_names:
+            task_queue.put((row, llm_name))
+
+    def worker(worker_id: int) -> None:
+        nonlocal inserted
+        worker_supabase = _get_supabase()
+        worker_clients = build_llm_clients()
+        _resolve_clients(llm_names, worker_clients)
+        sandbox = create_e2b_sandbox()
+        try:
+            while True:
+                task = task_queue.get()
+                if task is None:
+                    task_queue.task_done()
+                    return
+                row, llm_name = task
+                client = worker_clients.get(llm_name)
+                if client is None:
+                    logger.error("worker=%s missing client llm=%s", worker_id, llm_name)
+                    task_queue.task_done()
+                    continue
+                model_family = row.get("model_family") or "classifier"
+                prompt_text = row.get("prompt_text") or ""
+                prompt_id = row.get("id")
+                if not prompt_id:
+                    task_queue.task_done()
+                    continue
                 try:
-                    if _prompt_done(supabase, prompt_id, client.name):
+                    if _prompt_done(worker_supabase, prompt_id, client.name):
                         logger.info(
                             "skipping existing generation | prompt_id=%s llm=%s",
                             prompt_id,
@@ -258,8 +288,15 @@ def main() -> None:
                             )
                             continue
                     payload = _build_payload(row, client.name, class_name, file_name, code, metrics, eval_time)
-                    supabase.table(MODEL_TABLE).insert(payload).execute()
-                    inserted += 1
+                    worker_supabase.table(MODEL_TABLE).insert(payload).execute()
+                    with inserted_lock:
+                        inserted += 1
+                    logger.info(
+                        "%s finished evaluating prompt_id=%s class=%s",
+                        client.name,
+                        prompt_id,
+                        class_name,
+                    )
                     logger.info("saved model | prompt_id=%s llm=%s class=%s", prompt_id, client.name, class_name)
                 except Exception as exc:
                     logger.error(
@@ -268,9 +305,22 @@ def main() -> None:
                         client.name,
                         exc,
                     )
-                    continue
-    finally:
-        close_e2b_sandbox(sandbox)
+                finally:
+                    task_queue.task_done()
+        finally:
+            close_e2b_sandbox(sandbox)
+
+    workers = []
+    for worker_id in range(args.workers):
+        thread = threading.Thread(target=worker, args=(worker_id,), daemon=True)
+        workers.append(thread)
+        thread.start()
+
+    task_queue.join()
+    for _ in workers:
+        task_queue.put(None)
+    for thread in workers:
+        thread.join()
 
     if inserted:
         recompute_min_max_scores_for_table(supabase, MODEL_TABLE)
