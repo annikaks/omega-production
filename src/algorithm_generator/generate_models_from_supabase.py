@@ -217,46 +217,46 @@ def main() -> None:
                         client.name,
                         class_name,
                     )
-                try:
-                    metrics, eval_time = _evaluate_code_with_e2b(
-                        sandbox,
-                        code,
-                        class_name,
-                        dataset_names,
-                    )
-                except E2BSandboxError as exc:
-                    if _should_recreate_sandbox(exc):
-                        logger.warning(
-                            "e2b sandbox expired; recreating | prompt_id=%s llm=%s error=%s",
-                            prompt_id,
-                            client.name,
-                            exc,
+                    try:
+                        metrics, eval_time = _evaluate_code_with_e2b(
+                            sandbox,
+                            code,
+                            class_name,
+                            dataset_names,
                         )
-                        close_e2b_sandbox(sandbox)
-                        sandbox = create_e2b_sandbox()
-                        try:
-                            metrics, eval_time = _evaluate_code_with_e2b(
-                                sandbox,
-                                code,
-                                class_name,
-                                dataset_names,
-                            )
-                        except E2BSandboxError as retry_exc:
-                            logger.error(
-                                "e2b evaluation failed after recreate | prompt_id=%s llm=%s error=%s",
+                    except E2BSandboxError as exc:
+                        if _should_recreate_sandbox(exc):
+                            logger.warning(
+                                "e2b sandbox expired; recreating | prompt_id=%s llm=%s error=%s",
                                 prompt_id,
                                 client.name,
-                                retry_exc,
+                                exc,
+                            )
+                            close_e2b_sandbox(sandbox)
+                            sandbox = create_e2b_sandbox()
+                            try:
+                                metrics, eval_time = _evaluate_code_with_e2b(
+                                    sandbox,
+                                    code,
+                                    class_name,
+                                    dataset_names,
+                                )
+                            except E2BSandboxError as retry_exc:
+                                logger.error(
+                                    "e2b evaluation failed after recreate | prompt_id=%s llm=%s error=%s",
+                                    prompt_id,
+                                    client.name,
+                                    retry_exc,
+                                )
+                                continue
+                        else:
+                            logger.error(
+                                "e2b evaluation failed | prompt_id=%s llm=%s error=%s",
+                                prompt_id,
+                                client.name,
+                                exc,
                             )
                             continue
-                    else:
-                        logger.error(
-                            "e2b evaluation failed | prompt_id=%s llm=%s error=%s",
-                            prompt_id,
-                            client.name,
-                            exc,
-                        )
-                        continue
                     payload = _build_payload(row, client.name, class_name, file_name, code, metrics, eval_time)
                     supabase.table(MODEL_TABLE).insert(payload).execute()
                     inserted += 1
