@@ -84,11 +84,14 @@ def recompute_min_max_scores_for_table(
     supabase,
     table_name: str,
 ) -> Dict[str, Dict[str, float]]:
-    columns = ",".join(["id"] + [column for _dataset, column in DATASET_COLUMNS])
+    columns = ",".join(["id", "algorithm_code"] + [column for _dataset, column in DATASET_COLUMNS])
     res = supabase.table(table_name).select(columns).execute()
     rows = res.data or []
     bounds = compute_bounds_from_rows(rows)
     for row in rows:
+        algorithm_code = row.get("algorithm_code") or ""
+        if isinstance(algorithm_code, str) and algorithm_code.startswith("ERROR:"):
+            continue
         metrics = {
             dataset: _coerce_float(row.get(column))
             for dataset, column in DATASET_COLUMNS

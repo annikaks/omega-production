@@ -121,13 +121,18 @@ def _resolve_clients(requested: List[str], available: dict) -> List[LLMClient]:
 def _prompt_done(supabase: Client, prompt_id: str, llm_name: str) -> bool:
     res = (
         supabase.table(MODEL_TABLE)
-        .select("id")
+        .select("id, algorithm_code")
         .eq("prompt_id", prompt_id)
         .eq("generator_llm", llm_name)
-        .limit(1)
+        .limit(10)
         .execute()
     )
-    return bool(res.data)
+    rows = res.data or []
+    for row in rows:
+        code = row.get("algorithm_code") or ""
+        if not (isinstance(code, str) and code.startswith("ERROR:")):
+            return True
+    return False
 
 
 def _code_hash(code: str) -> str:
@@ -160,6 +165,42 @@ def _build_payload(
     for dataset, column in DATASET_COLUMNS:
         payload[column] = float(metrics.get(dataset, 0.0))
     return payload
+
+
+def _insert_error_row(
+    supabase: Client,
+    prompt_row: Dict[str, object],
+    llm_name: str,
+    reason: str,
+    detail: str | None = None,
+) -> None:
+    prompt_id = prompt_row.get("id")
+    if not prompt_id:
+        return
+    res = (
+        supabase.table(MODEL_TABLE)
+        .select("id, algorithm_code")
+        .eq("prompt_id", prompt_id)
+        .eq("generator_llm", llm_name)
+        .limit(10)
+        .execute()
+    )
+    for row in res.data or []:
+        code = row.get("algorithm_code") or ""
+        if isinstance(code, str) and code.startswith("ERROR:"):
+            return
+    msg = f"ERROR: reason={reason}"
+    if detail:
+        msg = f"{msg} detail={detail}"
+    payload = {
+        "prompt_id": prompt_id,
+        "prompt_text": prompt_row.get("prompt_text"),
+        "prompt_source_llm": prompt_row.get("source_llm"),
+        "generator_llm": llm_name,
+        "algorithm_code": msg,
+        "summary": "error generating model",
+    }
+    supabase.table(MODEL_TABLE).insert(payload).execute()
 
 
 def main() -> None:
@@ -245,6 +286,12 @@ def main() -> None:
                             prompt_id,
                             client.name,
                         )
+                        _insert_error_row(
+                            worker_supabase,
+                            row,
+                            client.name,
+                            "missing_code_or_class",
+                        )
                         continue
                     logger.info(
                         "evaluating in e2b | prompt_id=%s llm=%s class=%s",
@@ -288,6 +335,13 @@ def main() -> None:
                                     prompt_id,
                                     client.name,
                                 )
+                                _insert_error_row(
+                                    worker_supabase,
+                                    row,
+                                    client.name,
+                                    "e2b_eval_failed",
+                                    str(retry_exc),
+                                )
                                 continue
                         else:
                             logger.error(
@@ -300,6 +354,13 @@ def main() -> None:
                                 "error generating model | prompt_id=%s llm=%s reason=e2b_eval_failed",
                                 prompt_id,
                                 client.name,
+                            )
+                            _insert_error_row(
+                                worker_supabase,
+                                row,
+                                client.name,
+                                "e2b_eval_failed",
+                                str(exc),
                             )
                             continue
                     payload = _build_payload(row, client.name, class_name, file_name, code, metrics, eval_time)
@@ -324,6 +385,13 @@ def main() -> None:
                         "error generating model | prompt_id=%s llm=%s reason=exception",
                         prompt_id,
                         client.name,
+                    )
+                    _insert_error_row(
+                        worker_supabase,
+                        row,
+                        client.name,
+                        "exception",
+                        str(exc),
                     )
                 finally:
                     task_queue.task_done()
