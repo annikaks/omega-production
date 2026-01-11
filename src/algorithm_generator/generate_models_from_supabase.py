@@ -240,6 +240,11 @@ def main() -> None:
                     code = _extract_code_snippet(response)
                     if not class_name or not code:
                         logger.warning("missing code/class | prompt_id=%s llm=%s", prompt_id, client.name)
+                        logger.error(
+                            "error generating model | prompt_id=%s llm=%s reason=missing_code_or_class",
+                            prompt_id,
+                            client.name,
+                        )
                         continue
                     logger.info(
                         "evaluating in e2b | prompt_id=%s llm=%s class=%s",
@@ -278,6 +283,11 @@ def main() -> None:
                                     client.name,
                                     retry_exc,
                                 )
+                                logger.error(
+                                    "error generating model | prompt_id=%s llm=%s reason=e2b_eval_failed",
+                                    prompt_id,
+                                    client.name,
+                                )
                                 continue
                         else:
                             logger.error(
@@ -285,6 +295,11 @@ def main() -> None:
                                 prompt_id,
                                 client.name,
                                 exc,
+                            )
+                            logger.error(
+                                "error generating model | prompt_id=%s llm=%s reason=e2b_eval_failed",
+                                prompt_id,
+                                client.name,
                             )
                             continue
                     payload = _build_payload(row, client.name, class_name, file_name, code, metrics, eval_time)
@@ -304,6 +319,11 @@ def main() -> None:
                         prompt_id,
                         client.name,
                         exc,
+                    )
+                    logger.error(
+                        "error generating model | prompt_id=%s llm=%s reason=exception",
+                        prompt_id,
+                        client.name,
                     )
                 finally:
                     task_queue.task_done()
