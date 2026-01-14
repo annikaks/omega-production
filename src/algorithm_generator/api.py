@@ -48,7 +48,7 @@ algo_gen = None
 suite = None
 analyzer = None 
 queue_manager = None
-app = FastAPI(title="OMEGA")
+app = FastAPI(title="OMEGA", docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.on_event("startup")
@@ -143,6 +143,11 @@ def eval_single_ds(args):
 async def read_index():
     logger.info("read_index called")
     return FileResponse(str(STATIC_DIR / "index.html"))
+
+@app.get("/docs")
+async def read_docs():
+    logger.info("read_docs called")
+    return FileResponse(str(STATIC_DIR / "apidocs.html"))
 
 @app.post("/generate")
 async def handle_synthesis(req: SynthesisRequest):
