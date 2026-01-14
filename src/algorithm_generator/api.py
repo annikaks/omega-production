@@ -261,7 +261,7 @@ def get_queue_status(job_id: str):
 def get_leaderboard():
     logger.info("get_leaderboard called")
     res = supabase.table("algorithms") \
-        .select("id, class_name, aggregate_acc, min_max_score, creator_name, user_prompt") \
+        .select("id, class_name, min_max_score, creator_name, user_prompt") \
         .order("min_max_score", desc=True) \
         .execute()
     
@@ -270,10 +270,8 @@ def get_leaderboard():
         user_models.append({
             "id": row['id'],
             "name": row['class_name'],
-            "raw_acc": row['aggregate_acc'], 
             "display_acc": row['min_max_score'], 
             "creator_name": row.get('creator_name'),
-            "user_prompt": row.get('user_prompt'),
             "is_baseline": row.get('user_prompt') == 'benchmark'
         })
     
@@ -282,44 +280,27 @@ def get_leaderboard():
 @app.get("/leaderboard-history")
 def get_leaderboard_history():
     logger.info("get_leaderboard_history called")
-    res = (
-        supabase.table("algorithms")
-        .select("id, class_name, aggregate_acc, min_max_score, creator_name, user_prompt, created_at")
-        .execute()
-    )
-    rows = res.data or []
-    parsed = []
-    for row in rows:
-        created_at = row.get("created_at")
-        created_dt = None
-        if isinstance(created_at, str):
-            try:
-                created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-            except ValueError:
-                created_dt = None
-        parsed.append({**row, "_created_at_dt": created_dt})
-
     now = datetime.now(timezone.utc)
     days = []
     for offset in range(7):
         day = (now - timedelta(days=offset)).date()
+        day_start = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
         day_end = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
-        candidates = [
-            row for row in parsed
-            if row["_created_at_dt"] is not None and row["_created_at_dt"] < day_end
-        ]
-        candidates.sort(key=lambda r: (r.get("min_max_score") or 0.0), reverse=True)
-        top = candidates[:10]
+        res = (
+            supabase.table("algorithms")
+            .select("id, class_name, min_max_score, creator_name, created_at")
+            .lt("created_at", day_end.isoformat())
+            .order("min_max_score", desc=True)
+            .limit(10)
+            .execute()
+        )
         ranked_list = []
-        for row in top:
+        for row in res.data or []:
             ranked_list.append({
                 "id": row["id"],
                 "name": row["class_name"],
-                "raw_acc": row.get("aggregate_acc"),
                 "display_acc": row.get("min_max_score"),
                 "creator_name": row.get("creator_name"),
-                "user_prompt": row.get("user_prompt"),
-                "created_at": row.get("created_at"),
             })
         days.append({"date": day.isoformat(), "ranked_list": ranked_list})
 
