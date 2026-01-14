@@ -31,8 +31,8 @@
 
   <main class="max-w-4xl mx-auto px-4 md:px-6">
     <div class="text-center mb-8 md:mb-10">
-      <h1 class="text-3xl md:text-5xl mb-3 md:mb-4 font-light text-gray-900 leading-tight">Generate API</h1>
-      <p class="text-gray-400 italic text-base md:text-lg text-balance px-4">A single endpoint for new architecture synthesis and benchmarking.</p>
+      <h1 class="text-3xl md:text-5xl mb-3 md:mb-4 font-light text-gray-900 leading-tight">API Docs</h1>
+      <p class="text-gray-400 italic text-base md:text-lg text-balance px-4">Core endpoints for synthesis, account lookup, and code retrieval.</p>
     </div>
 
     <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100 mb-6 md:mb-8">
@@ -49,6 +49,15 @@
       <p class="text-gray-500 mt-4 md:mt-5 text-sm md:text-base">
         Submit a prompt plus creator metadata. The service synthesizes a model, benchmarks it, and stores the result.
       </p>
+      <div class="mt-6">
+        <div class="text-[10px] uppercase tracking-widest text-gray-400 font-sans mb-2">cURL</div>
+        <pre class="code-block rounded-xl p-4 text-xs md:text-sm overflow-x-auto">curl -X POST https://YOUR_DOMAIN/generate \
+  -H "Content-Type: application/json" \
+  -d '{"description":"Design a hybrid forest with directional splits.","user_id":"user_123","creator_name":"Ada"}'</pre>
+        <p class="text-xs md:text-sm text-gray-400 mt-4">
+          Replace YOUR_DOMAIN with the deployment host. Requires a valid user_id from your auth layer.
+        </p>
+      </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
@@ -99,14 +108,57 @@
     </div>
 
     <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100 mt-6 md:mt-8">
-      <div class="text-[10px] uppercase tracking-widest text-gray-400 font-sans">cURL</div>
-      <h2 class="text-2xl md:text-3xl font-light mt-2 mb-4">Quick Test</h2>
-      <pre class="code-block rounded-xl p-4 text-xs md:text-sm overflow-x-auto">curl -X POST https://YOUR_DOMAIN/generate \
-  -H "Content-Type: application/json" \
-  -d '{"description":"Design a hybrid forest with directional splits.","user_id":"user_123","creator_name":"Ada"}'</pre>
-      <p class="text-xs md:text-sm text-gray-400 mt-4">
-        Replace YOUR_DOMAIN with the deployment host. Requires a valid user_id from your auth layer.
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <div class="text-[10px] uppercase tracking-widest text-gray-400 font-sans">Endpoint</div>
+          <div class="text-xl md:text-2xl font-light mt-1">/my_info</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="gold-bg text-white text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full">GET</span>
+          <span class="text-[10px] uppercase tracking-widest text-gray-400 font-sans">JSON</span>
+        </div>
+      </div>
+      <p class="text-gray-500 mt-4 md:mt-5 text-sm md:text-base">
+        Returns the current user's id and display name based on the Supabase access token.
       </p>
+      <div class="mt-6">
+        <div class="text-[10px] uppercase tracking-widest text-gray-400 font-sans mb-2">Example</div>
+        <pre class="code-block rounded-xl p-4 text-xs md:text-sm overflow-x-auto">{
+  "user_id": "user_123",
+  "creator_name": "Ada"
+}</pre>
+      </div>
+      <div class="mt-6">
+        <div class="text-[10px] uppercase tracking-widest text-gray-400 font-sans mb-2">cURL</div>
+        <pre class="code-block rounded-xl p-4 text-xs md:text-sm overflow-x-auto">curl -H "Authorization: Bearer YOUR_SUPABASE_TOKEN" \
+  https://YOUR_DOMAIN/my_info</pre>
+        <p class="text-xs md:text-sm text-gray-400 mt-4">
+          Use the access token from your Supabase session.
+        </p>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100 mt-6 md:mt-8">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <div class="text-[10px] uppercase tracking-widest text-gray-400 font-sans">Endpoint</div>
+          <div class="text-xl md:text-2xl font-light mt-1">/algorithm-code/by-class/{class_name}</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="gold-bg text-white text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full">GET</span>
+          <span class="text-[10px] uppercase tracking-widest text-gray-400 font-sans">Text</span>
+        </div>
+      </div>
+      <p class="text-gray-500 mt-4 md:mt-5 text-sm md:text-base">
+        Download the generated model code by unique class name.
+      </p>
+      <div class="mt-6">
+        <div class="text-[10px] uppercase tracking-widest text-gray-400 font-sans mb-2">cURL</div>
+        <pre class="code-block rounded-xl p-4 text-xs md:text-sm overflow-x-auto">curl -L https://YOUR_DOMAIN/algorithm-code/by-class/DirectionalForest</pre>
+        <p class="text-xs md:text-sm text-gray-400 mt-4">
+          The response is plain text and returns a download filename when available.
+        </p>
+      </div>
     </div>
   </main>
 </body>

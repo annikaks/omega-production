@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -343,22 +343,48 @@ async def get_summary(model_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/algorithm-code/{model_id}")
-def get_algorithm_code(model_id: str):
-    logger.info("get_algorithm_code called for model_id=%s", model_id)
+@app.get("/algorithm-code/by-class/{class_name}")
+def get_algorithm_code_by_class(class_name: str):
+    logger.info("get_algorithm_code_by_class called for class_name=%s", class_name)
     res = (
         supabase.table("algorithms")
         .select("class_name, file_name, algorithm_code")
-        .eq("id", model_id)
+        .eq("class_name", class_name)
         .single()
         .execute()
     )
     if not res.data or not res.data.get("algorithm_code"):
         raise HTTPException(status_code=404, detail="Algorithm code not found")
-    class_name = res.data.get("class_name") or "model"
     filename = res.data.get("file_name") or f"{class_name}.py"
     headers = {"Content-Disposition": f"attachment; filename=\"{filename}\""}
     return Response(res.data["algorithm_code"], media_type="text/plain; charset=utf-8", headers=headers)
+
+@app.get("/my_info")
+def get_my_info(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(status_code=401, detail="Invalid Authorization header")
+    token = parts[1]
+    try:
+        user_res = supabase.auth.get_user(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user = getattr(user_res, "user", None)
+    if user is None and isinstance(user_res, dict):
+        user = user_res.get("user")
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user_id = getattr(user, "id", None) or (user.get("id") if isinstance(user, dict) else None)
+    user_metadata = getattr(user, "user_metadata", None) or (user.get("user_metadata") if isinstance(user, dict) else {})
+    email = getattr(user, "email", None) or (user.get("email") if isinstance(user, dict) else None)
+    display_name = None
+    if isinstance(user_metadata, dict):
+        display_name = user_metadata.get("display_name") or user_metadata.get("full_name")
+    if not display_name and email:
+        display_name = email.split("@")[0]
+    return {"user_id": user_id, "creator_name": display_name}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)
