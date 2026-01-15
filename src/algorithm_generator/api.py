@@ -13,7 +13,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, Header
+from postgrest.exceptions import APIError
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -48,8 +49,14 @@ algo_gen = None
 suite = None
 analyzer = None 
 queue_manager = None
-app = FastAPI(title="OMEGA")
+app = FastAPI(title="OMEGA", docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+def _coerce_float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
 
 @app.on_event("startup")
 def startup_event():
@@ -143,6 +150,11 @@ def eval_single_ds(args):
 async def read_index():
     logger.info("read_index called")
     return FileResponse(str(STATIC_DIR / "index.html"))
+
+@app.get("/docs")
+async def read_docs():
+    logger.info("read_docs called")
+    return FileResponse(str(STATIC_DIR / "apidocs.html"))
 
 @app.post("/generate")
 async def handle_synthesis(req: SynthesisRequest):
@@ -272,10 +284,93 @@ def get_leaderboard():
             "name": row['class_name'],
             "display_acc": row['min_max_score'], 
             "creator_name": row.get('creator_name'),
-            "is_baseline": row.get('user_prompt') == 'benchmark'
+            "is_baseline": row.get('user_prompt') == 'benchmark',
+            "source": "algorithms",
         })
     
-    return {"ranked_list": user_models}
+    return {"ranked_list": user_models[:500]}
+
+@app.get("/leaderboard-generations")
+def get_leaderboard_generations():
+    logger.info("get_leaderboard_generations called")
+
+    def _parse_created_at(value: Optional[str]) -> Optional[datetime]:
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+    algo_rows = (
+        supabase.table("algorithms")
+        .select("id, class_name, min_max_score, creator_name, summary, created_at, user_prompt")
+        .order("created_at", desc=True)
+        .execute()
+    )
+    try:
+        gen_rows = (
+            supabase.table("model_generations")
+            .select("id, class_name, min_max_score, generator_llm, summary, created_at")
+            .order("created_at", desc=True)
+            .execute()
+        )
+    except APIError:
+        logger.warning("model_generations.created_at missing; falling back to min_max_score ordering")
+        gen_rows = (
+            supabase.table("model_generations")
+            .select("id, class_name, min_max_score, generator_llm, summary")
+            .order("min_max_score", desc=True)
+            .execute()
+        )
+
+    merged: Dict[str, Dict[str, Any]] = {}
+    for row in algo_rows.data or []:
+        class_name = row.get("class_name")
+        if not class_name:
+            continue
+        merged[class_name] = {
+            "id": row.get("id"),
+            "name": class_name,
+            "display_acc": _coerce_float(row.get("min_max_score")),
+            "creator_name": row.get("creator_name"),
+            "summary": row.get("summary"),
+            "is_baseline": row.get("user_prompt") == "benchmark",
+            "source": "algorithms",
+            "_created_at": _parse_created_at(row.get("created_at")),
+        }
+
+    for row in gen_rows.data or []:
+        class_name = row.get("class_name")
+        if not class_name:
+            continue
+        created_at = _parse_created_at(row.get("created_at")) if isinstance(row, dict) else None
+        candidate = {
+            "id": row.get("id") or class_name,
+            "name": class_name,
+            "display_acc": _coerce_float(row.get("min_max_score")),
+            "creator_name": row.get("generator_llm"),
+            "summary": row.get("summary"),
+            "is_baseline": False,
+            "source": "model_generations",
+            "_created_at": created_at,
+        }
+        existing = merged.get(class_name)
+        if not existing:
+            merged[class_name] = candidate
+            continue
+        existing_ts = existing.get("_created_at")
+        if existing_ts is None and created_at is None:
+            continue
+        if existing_ts is None or (created_at and created_at > existing_ts):
+            merged[class_name] = candidate
+
+    models = list(merged.values())
+    models.sort(key=lambda item: (item.get("display_acc") if item.get("display_acc") is not None else -1.0), reverse=True)
+    models = models[:500]
+    for item in models:
+        item.pop("_created_at", None)
+    return {"ranked_list": models}
 
 @app.get("/leaderboard-history")
 def get_leaderboard_history():
@@ -301,6 +396,7 @@ def get_leaderboard_history():
                 "name": row["class_name"],
                 "display_acc": row.get("min_max_score"),
                 "creator_name": row.get("creator_name"),
+                "source": "algorithms",
             })
         days.append({"date": day.isoformat(), "ranked_list": ranked_list})
 
@@ -313,47 +409,230 @@ def get_dataset_stats():
     return {"stats": dict(sorted(data.items()))}
 
 @app.get("/summarize/{model_id}")
-async def get_summary(model_id: str):
+async def get_summary(model_id: str, source: Optional[str] = None):
     try:
         logger.info("get_summary called for model_id=%s", model_id)
-        res = (
-            supabase.table("algorithms")
-            .select("summary, file_name, algorithm_code")
-            .eq("id", model_id)
-            .single()
+        if source == "model_generations":
+            gen_res = (
+                supabase.table("model_generations")
+                .select("summary, algorithm_code")
+                .eq("id", model_id)
+                .limit(1)
+                .execute()
+            )
+            if not gen_res.data:
+                raise HTTPException(status_code=404, detail="Summary not found")
+            row = gen_res.data[0]
+            if row.get("summary"):
+                return {"summary": row["summary"]}
+            if row.get("algorithm_code"):
+                summary = analyzer.describe_code(row["algorithm_code"])
+                if "Error" in summary:
+                    return {"summary": "Error"}
+                supabase.table("model_generations").update({"summary": summary}).eq("id", model_id).execute()
+                return {"summary": summary}
+            raise HTTPException(status_code=404, detail="Summary not found")
+
+        if source == "algorithms":
+            try:
+                uuid.UUID(model_id)
+            except ValueError:
+                raise HTTPException(status_code=404, detail="Summary not found")
+            res = (
+                supabase.table("algorithms")
+                .select("summary, file_name, algorithm_code")
+                .eq("id", model_id)
+                .limit(1)
+                .execute()
+            )
+            if not res.data:
+                raise HTTPException(status_code=404, detail="Summary not found")
+            res_data = res.data[0]
+            if res_data.get("summary"):
+                return {"summary": res_data["summary"]}
+            if res_data.get("algorithm_code"):
+                summary = analyzer.describe_code(res_data["algorithm_code"])
+            else:
+                summary = analyzer.describe_single(GENERATION_DIRECTORY_PATH, res_data["file_name"])
+            if "Error" in summary:
+                return {"summary": "Error"}
+            supabase.table("algorithms").update({"summary": summary}).eq("id", model_id).execute()
+            return {"summary": summary}
+
+        res_data = None
+        try:
+            uuid.UUID(model_id)
+            res = (
+                supabase.table("algorithms")
+                .select("summary, file_name, algorithm_code")
+                .eq("id", model_id)
+                .limit(1)
+                .execute()
+            )
+            res_data = res.data[0] if res.data else None
+        except ValueError:
+            res_data = None
+        except APIError as exc:
+            logger.warning("summary lookup in algorithms failed: %s", exc)
+            res_data = None
+        if res_data:
+            if res_data.get("summary"):
+                return {"summary": res_data["summary"]}
+            if res_data.get("algorithm_code"):
+                summary = analyzer.describe_code(res_data["algorithm_code"])
+            else:
+                summary = analyzer.describe_single(GENERATION_DIRECTORY_PATH, res_data["file_name"])
+            if "Error" in summary:
+                return {"summary": "Error"}
+            supabase.table("algorithms").update({"summary": summary}).eq("id", model_id).execute()
+            return {"summary": summary}
+
+        gen_res = (
+            supabase.table("model_generations")
+            .select("summary, algorithm_code, created_at")
+            .eq("class_name", model_id)
+            .order("created_at", desc=True)
+            .limit(1)
             .execute()
         )
-        if res.data.get("summary"):
-            return {"summary": res.data["summary"]}
-
-        if res.data.get("algorithm_code"):
-            summary = analyzer.describe_code(res.data["algorithm_code"])
-        else:
-            summary = analyzer.describe_single(GENERATION_DIRECTORY_PATH, res.data["file_name"])
-        if "Error" in summary:
-            return {"summary": "Error"}
-        
-        supabase.table("algorithms").update({"summary": summary}).eq("id", model_id).execute()
-        return {"summary": summary}
+        if gen_res.data:
+            row = gen_res.data[0]
+            if row.get("summary"):
+                return {"summary": row["summary"]}
+            if row.get("algorithm_code"):
+                summary = analyzer.describe_code(row["algorithm_code"])
+                if "Error" in summary:
+                    return {"summary": "Error"}
+                supabase.table("model_generations").update({"summary": summary}).eq("class_name", model_id).execute()
+                return {"summary": summary}
+        raise HTTPException(status_code=404, detail="Summary not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/algorithm-code/{model_id}")
-def get_algorithm_code(model_id: str):
-    logger.info("get_algorithm_code called for model_id=%s", model_id)
+@app.get("/algorithm-code/by-class/{class_name}")
+def get_algorithm_code_by_class(class_name: str):
+    logger.info("get_algorithm_code_by_class called for class_name=%s", class_name)
     res = (
         supabase.table("algorithms")
         .select("class_name, file_name, algorithm_code")
-        .eq("id", model_id)
-        .single()
+        .eq("class_name", class_name)
+        .limit(1)
         .execute()
     )
-    if not res.data or not res.data.get("algorithm_code"):
+    if res.data:
+        row = res.data[0]
+        if row.get("algorithm_code"):
+            filename = row.get("file_name") or f"{class_name}.py"
+            headers = {"Content-Disposition": f"attachment; filename=\"{filename}\""}
+            return Response(row["algorithm_code"], media_type="text/plain; charset=utf-8", headers=headers)
+    alt = (
+        supabase.table("model_generations")
+        .select("class_name, algorithm_code")
+        .eq("class_name", class_name)
+        .limit(1)
+        .execute()
+    )
+    if not alt.data:
         raise HTTPException(status_code=404, detail="Algorithm code not found")
-    class_name = res.data.get("class_name") or "model"
-    filename = res.data.get("file_name") or f"{class_name}.py"
+    row = alt.data[0]
+    if not row.get("algorithm_code"):
+        raise HTTPException(status_code=404, detail="Algorithm code not found")
+    filename = f"{class_name}.py"
     headers = {"Content-Disposition": f"attachment; filename=\"{filename}\""}
-    return Response(res.data["algorithm_code"], media_type="text/plain; charset=utf-8", headers=headers)
+    return Response(row["algorithm_code"], media_type="text/plain; charset=utf-8", headers=headers)
+
+@app.get("/algorithm-code/by-id/{model_id}")
+def get_algorithm_code_by_id(model_id: str, source: Optional[str] = None):
+    logger.info("get_algorithm_code_by_id called for model_id=%s source=%s", model_id, source)
+    if source == "model_generations":
+        res = (
+            supabase.table("model_generations")
+            .select("id, class_name, algorithm_code")
+            .eq("id", model_id)
+            .limit(1)
+            .execute()
+        )
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Algorithm code not found")
+        row = res.data[0]
+        if not row.get("algorithm_code"):
+            raise HTTPException(status_code=404, detail="Algorithm code not found")
+        filename = f"{row.get('class_name') or 'model'}.py"
+        headers = {"Content-Disposition": f"attachment; filename=\"{filename}\""}
+        return Response(row["algorithm_code"], media_type="text/plain; charset=utf-8", headers=headers)
+
+    if source == "algorithms":
+        res = (
+            supabase.table("algorithms")
+            .select("id, class_name, file_name, algorithm_code")
+            .eq("id", model_id)
+            .limit(1)
+            .execute()
+        )
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Algorithm code not found")
+        row = res.data[0]
+        if not row.get("algorithm_code"):
+            raise HTTPException(status_code=404, detail="Algorithm code not found")
+        filename = row.get("file_name") or f"{row.get('class_name') or 'model'}.py"
+        headers = {"Content-Disposition": f"attachment; filename=\"{filename}\""}
+        return Response(row["algorithm_code"], media_type="text/plain; charset=utf-8", headers=headers)
+
+    res = (
+        supabase.table("algorithms")
+        .select("id, class_name, file_name, algorithm_code")
+        .eq("id", model_id)
+        .limit(1)
+        .execute()
+    )
+    if res.data:
+        row = res.data[0]
+        if row.get("algorithm_code"):
+            filename = row.get("file_name") or f"{row.get('class_name') or 'model'}.py"
+            headers = {"Content-Disposition": f"attachment; filename=\"{filename}\""}
+            return Response(row["algorithm_code"], media_type="text/plain; charset=utf-8", headers=headers)
+    alt = (
+        supabase.table("model_generations")
+        .select("id, class_name, algorithm_code")
+        .eq("id", model_id)
+        .limit(1)
+        .execute()
+    )
+    if not alt.data:
+        raise HTTPException(status_code=404, detail="Algorithm code not found")
+    row = alt.data[0]
+    if not row.get("algorithm_code"):
+        raise HTTPException(status_code=404, detail="Algorithm code not found")
+    filename = f"{row.get('class_name') or 'model'}.py"
+    headers = {"Content-Disposition": f"attachment; filename=\"{filename}\""}
+    return Response(row["algorithm_code"], media_type="text/plain; charset=utf-8", headers=headers)
+
+@app.get("/my_info")
+def get_my_info(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(status_code=401, detail="Invalid Authorization header")
+    token = parts[1]
+    try:
+        user_res = supabase.auth.get_user(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user = getattr(user_res, "user", None)
+    if user is None and isinstance(user_res, dict):
+        user = user_res.get("user")
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user_id = getattr(user, "id", None) or (user.get("id") if isinstance(user, dict) else None)
+    user_metadata = getattr(user, "user_metadata", None) or (user.get("user_metadata") if isinstance(user, dict) else {})
+    email = getattr(user, "email", None) or (user.get("email") if isinstance(user, dict) else None)
+    display_name = None
+    if isinstance(user_metadata, dict):
+        display_name = user_metadata.get("display_name") or user_metadata.get("full_name")
+    if not display_name and email:
+        display_name = email.split("@")[0]
+    return {"user_id": user_id, "creator_name": display_name}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)
