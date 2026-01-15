@@ -51,11 +51,14 @@
       </p>
       <div class="mt-6">
         <div class="text-[10px] uppercase tracking-widest text-gray-400 font-sans mb-2">cURL</div>
-        <pre class="code-block rounded-xl p-4 text-xs md:text-sm overflow-x-auto">curl -X POST https://YOUR_DOMAIN/generate \
+        <div class="relative">
+          <button type="button" data-copy-target="curl-generate" class="absolute top-2 right-2 text-[10px] uppercase tracking-widest bg-white/90 border border-gray-200 text-gray-500 px-2 py-1 rounded-full hover:text-black hover:border-gray-300">Copy</button>
+          <pre id="curl-generate" class="code-block rounded-xl p-4 text-xs md:text-sm overflow-x-auto">curl -X POST https://YOUR_DOMAIN/generate \
   -H "Content-Type: application/json" \
   -d '{"description":"Design a hybrid forest with directional splits.","user_id":"user_123","creator_name":"Ada"}'</pre>
+        </div>
         <p class="text-xs md:text-sm text-gray-400 mt-4">
-          Replace YOUR_DOMAIN with the deployment host. Requires a valid user_id from your auth layer.
+          Replace YOUR_DOMAIN with the deployment host. Requires a valid user_id from your auth layer. You can find user_id using the /my_info endpoint.
         </p>
       </div>
     </div>
@@ -135,8 +138,11 @@
       </div>
       <div class="mt-6">
         <div class="text-[10px] uppercase tracking-widest text-gray-400 font-sans mb-2">cURL</div>
-        <pre class="code-block rounded-xl p-4 text-xs md:text-sm overflow-x-auto">curl -H "Authorization: Bearer YOUR_SUPABASE_TOKEN" \
+        <div class="relative">
+          <button type="button" data-copy-target="curl-my-info" class="absolute top-2 right-2 text-[10px] uppercase tracking-widest bg-white/90 border border-gray-200 text-gray-500 px-2 py-1 rounded-full hover:text-black hover:border-gray-300">Copy</button>
+          <pre id="curl-my-info" class="code-block rounded-xl p-4 text-xs md:text-sm overflow-x-auto">curl -H "Authorization: Bearer YOUR_SUPABASE_TOKEN" \
   https://YOUR_DOMAIN/my_info</pre>
+        </div>
         <p class="text-xs md:text-sm text-gray-400 mt-4">
           Use the access token from your Supabase session.
         </p>
@@ -159,12 +165,48 @@
       </p>
       <div class="mt-6">
         <div class="text-[10px] uppercase tracking-widest text-gray-400 font-sans mb-2">cURL</div>
-        <pre class="code-block rounded-xl p-4 text-xs md:text-sm overflow-x-auto">curl -L https://YOUR_DOMAIN/algorithm-code/by-class/DirectionalForest</pre>
+        <div class="relative">
+          <button type="button" data-copy-target="curl-algo-code" class="absolute top-2 right-2 text-[10px] uppercase tracking-widest bg-white/90 border border-gray-200 text-gray-500 px-2 py-1 rounded-full hover:text-black hover:border-gray-300">Copy</button>
+          <pre id="curl-algo-code" class="code-block rounded-xl p-4 text-xs md:text-sm overflow-x-auto">curl -L https://YOUR_DOMAIN/algorithm-code/by-class/DirectionalForest</pre>
+        </div>
         <p class="text-xs md:text-sm text-gray-400 mt-4">
           The response is plain text and returns a download filename when available.
         </p>
       </div>
     </div>
   </main>
+  <script>
+    document.querySelectorAll("[data-copy-target]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const targetId = btn.getAttribute("data-copy-target");
+        const target = document.getElementById(targetId);
+        if (!target) return;
+        const text = target.innerText;
+        try {
+          await navigator.clipboard.writeText(text);
+          const prev = btn.textContent;
+          btn.textContent = "Copied";
+          setTimeout(() => {
+            btn.textContent = prev;
+          }, 1200);
+        } catch (err) {
+          const temp = document.createElement("textarea");
+          temp.value = text;
+          temp.setAttribute("readonly", "");
+          temp.style.position = "absolute";
+          temp.style.left = "-9999px";
+          document.body.appendChild(temp);
+          temp.select();
+          document.execCommand("copy");
+          document.body.removeChild(temp);
+          const prev = btn.textContent;
+          btn.textContent = "Copied";
+          setTimeout(() => {
+            btn.textContent = prev;
+          }, 1200);
+        }
+      });
+    });
+  </script>
 </body>
 </html>
