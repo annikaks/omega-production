@@ -83,6 +83,16 @@
             <button id="tabLeaderboard" onclick="setView('leaderboard')" class="px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-700">Live</button>
             <button id="tabHistory" onclick="setView('history')" class="px-3 py-1 rounded-full border border-gray-100 hover:border-gray-200 hover:text-gray-600">History</button>
           </div>
+          <div class="flex items-center gap-3 text-[9px] md:text-[10px] uppercase tracking-widest font-bold text-gray-400">
+            <span class="hidden sm:inline">LLM Experiment</span>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input id="toggleExperiment" type="checkbox" class="peer sr-only">
+              <div class="w-10 h-5 bg-gray-200 rounded-full relative transition peer-checked:bg-[#D4AF37]">
+                <span id="toggleKnob" class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform duration-200"></span>
+              </div>
+              <span class="text-[9px] md:text-[10px] uppercase tracking-widest font-bold text-gray-400">Show</span>
+            </label>
+          </div>
         </div>
         <div class="text-right">
           <div class="text-[9px] uppercase tracking-widest text-gray-400">Metric</div>
@@ -138,6 +148,7 @@
     let lastGeneratedModel = null;
     let isSignUpMode = false;
     let detailsVisible = false;
+    let leaderboardSource = "omega";
 
     async function initSupabase() {
         try {
@@ -166,6 +177,14 @@
         initSupabase();
         refreshLeaderboard();
         setView('leaderboard');
+        setSource('omega');
+        const toggle = document.getElementById("toggleExperiment");
+        if (toggle) {
+          toggle.addEventListener("change", (event) => {
+            const enabled = event.target.checked;
+            setSource(enabled ? "generations" : "omega");
+          });
+        }
     });
 
     async function checkUser() {
@@ -368,6 +387,23 @@
       if (isHistory) refreshHistory();
     }
 
+    function setSource(source) {
+      leaderboardSource = source;
+      const tabHistory = document.getElementById("tabHistory");
+      const isGenerations = source === "generations";
+      const toggle = document.getElementById("toggleExperiment");
+      const knob = document.getElementById("toggleKnob");
+      if (toggle) toggle.checked = isGenerations;
+      if (knob) knob.style.transform = isGenerations ? "translateX(20px)" : "translateX(0)";
+      if (tabHistory) {
+        tabHistory.classList.toggle("opacity-40", isGenerations);
+        tabHistory.classList.toggle("pointer-events-none", isGenerations);
+        tabHistory.toggleAttribute("disabled", isGenerations);
+      }
+      if (isGenerations) setView("leaderboard");
+      refreshLeaderboard();
+    }
+
     function formatHistoryDate(isoDate) {
       const date = new Date(`${isoDate}T00:00:00Z`);
       return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
@@ -377,12 +413,13 @@
       const list = document.getElementById("leaderboardList");
       try {
         list.innerHTML = `<div class="text-sm text-gray-400 italic">Loading models...</div>`;
-        const res = await fetch("/leaderboard");
+        const endpoint = leaderboardSource === "generations" ? "/leaderboard-generations" : "/leaderboard";
+        const res = await fetch(endpoint);
         const data = await res.json();
         list.innerHTML = "";
-        data.ranked_list.forEach((m, idx) => {
+        data.ranked_list.slice(0, 500).forEach((m, idx) => {
             const isCurrent = lastGeneratedModel && m.id === lastGeneratedModel.id;
-            const isBaseline = m.user_prompt === 'benchmark' || m.is_baseline === true;
+            const isBaseline = leaderboardSource === "omega" && (m.user_prompt === 'benchmark' || m.is_baseline === true);
             const card = document.createElement("div");
             let bgColor = "bg-gray-50 border-gray-100 hover:border-gray-300";
             let textColor = "text-gray-300";
@@ -410,9 +447,9 @@
                     if (summaryEl.getAttribute('data-loaded') === 'false') {
                         summaryEl.innerText = "Synthesizing intuition...";
                         try {
-                            const sRes = await fetch(`/summarize/${m.id}`);
+                            const sRes = await fetch(`/summarize/${m.id}?source=${encodeURIComponent(m.source || "")}`);
                             const sData = await sRes.json();
-                            summaryEl.innerText = sData.summary;
+                            summaryEl.innerText = sData.summary || "Mathematical summary unavailable.";
                             summaryEl.setAttribute('data-loaded', 'true');
                         } catch (err) {
                             summaryEl.innerText = "Mathematical summary unavailable.";
@@ -427,11 +464,14 @@
                 }
             };
 
+            const codeHref = `/algorithm-code/by-id/${encodeURIComponent(m.id || '')}?source=${encodeURIComponent(m.source || "")}`;
+            const summaryText = m.summary || "Click to reveal architecture details...";
+            const summaryLoaded = !!m.summary;
             card.innerHTML = `
                 <div class="card-inner w-full min-h-[85px] relative">
                     <div class="card-front backface-hidden w-full p-4 md:p-5 rounded-xl border ${bgColor} flex items-center justify-between absolute inset-0 z-10 bg-inherit">
                         <div class="flex items-center justify-between w-full">
-                            <div class="flex items-center gap-4 md:gap-6 min-w-0">
+                            <div class="flex items-center gap-5 md:gap-8 min-w-0">
                                 <span class="text-lg md:text-2xl font-bold ${textColor} w-7 flex-shrink-0">#${idx + 1}</span>
                                 <div class="min-w-0">
                                     <div class="font-semibold text-sm md:text-lg truncate">${m.name}</div>
@@ -439,7 +479,7 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-3">
-                                <a href="/algorithm-code/${m.id}" class="text-gray-300 hover:text-gray-500 transition-colors" title="Download code" onclick="event.stopPropagation()">
+                                <a href="${codeHref}" class="text-gray-300 hover:text-gray-500 transition-colors" title="Download code" onclick="event.stopPropagation()">
                                   <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                                     <path d="M7 10l5 5 5-5"/>
@@ -454,8 +494,8 @@
                     <div class="card-back backface-hidden w-full p-4 md:p-5 rounded-xl border border-[#D4AF37]/30 bg-white absolute inset-0 flex flex-col justify-center">
                         <div class="text-[9px] uppercase tracking-widest gold-text mb-1 font-bold">Intuition</div>
                         <div class="summary-text text-[12px] md:text-[13px] leading-relaxed text-gray-600 italic font-serif" 
-                             data-loaded="${m.summary ? 'true' : 'false'}">
-                            ${m.summary || 'Click to reveal architecture details...'}
+                             data-loaded="${summaryLoaded ? 'true' : 'false'}">
+                            ${summaryText}
                         </div>
                     </div>
                 </div>`;
@@ -483,7 +523,7 @@
                   </div>
                 </div>
                 <div class="flex items-center gap-3">
-                  <a href="/algorithm-code/${m.id}" class="text-gray-300 hover:text-gray-500 transition-colors" title="Download code">
+                  <a href="/algorithm-code/by-id/${encodeURIComponent(m.id || '')}?source=${encodeURIComponent(m.source || '')}" class="text-gray-300 hover:text-gray-500 transition-colors" title="Download code">
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                       <path d="M7 10l5 5 5-5"/>
